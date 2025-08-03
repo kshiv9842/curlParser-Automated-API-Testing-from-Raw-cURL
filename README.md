@@ -4,8 +4,6 @@
 - Parses the command into method, URL, headers, and body
 - Sends the request using an internal client
 - Generates **negative test cases** automatically
-- Validates **response structures against JSON Schemas**
-- (Optionally) Validates **request payloads** before sending
 
 > No more repetitive Postman clicks or fragile test scripts. Just paste your `curl`, and you're ready to test.
 
@@ -19,8 +17,6 @@
    - Missing headers
    - Unauthorized access
    - Invalid or missing payload fields  
-✅ **Validate response using JSON Schema**  
-✅ (Optional) Validate request body before sending  
 ✅ Plug-and-play: easily integrate with test runners like JUnit, TestNG, etc.
 
 ---
