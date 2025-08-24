@@ -32,17 +32,16 @@
             logs.scrollTop = logs.scrollHeight;
         }
 
-        // Validate input and enable button only if starts with "curl --location "
+        // Enable button only if input is not empty and starts with "curl --location "
         curlInput.addEventListener("input", () => {
-            if (curlInput.value.trim().startsWith("curl --location ")) {
-                executeBtn.disabled = false;
-            } else {
-                executeBtn.disabled = true;
-            }
+            const trimmed = curlInput.value.trim();
+            executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
         });
 
         executeBtn.addEventListener("click", async () => {
             const curlCommand = curlInput.value.trim();
+
+            // Extra safety validation
             if (!curlCommand.startsWith("curl --location ")) {
                 appendLog("❌ Invalid cURL format. Must start with: curl --location");
                 return;
