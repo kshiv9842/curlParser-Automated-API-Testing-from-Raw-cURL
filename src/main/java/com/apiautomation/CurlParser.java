@@ -57,10 +57,10 @@ public class CurlParser {
     // Helper method to extract path params
     private static List<String> extractPathParams(String url) {
         final Pattern UUID_PATTERN = Pattern.compile("^[a-f0-9\\-]{20,}$", Pattern.CASE_INSENSITIVE);
-        final Pattern NUMERIC_ID_PATTERN = Pattern.compile("^\\d{4,}$");
+        final Pattern NUMERIC_ID_PATTERN = Pattern.compile("^\\d+$");
 
         // Only allow alphanumeric patterns with both letters and digits, at least 10 chars
-        final Pattern ALPHANUMERIC_PATTERN = Pattern.compile("^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z0-9_-]{10,}$");
+        final Pattern ALPHANUMERIC_PATTERN = Pattern.compile("^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z0-9_-]+$");
         List<String> dynamicParams = new ArrayList<>();
         try {
             // Remove domain and query parameters
@@ -72,6 +72,7 @@ public class CurlParser {
             String[] segments = path.split("/");
             for (String segment : segments) {
                 if (segment.isEmpty()) continue;
+                if (segment.matches("^v\\d+$")) continue;
                 // Match only if the segment looks like an ID or dynamic token
                 if (UUID_PATTERN.matcher(segment).matches() ||
                         NUMERIC_ID_PATTERN.matcher(segment).matches() ||
