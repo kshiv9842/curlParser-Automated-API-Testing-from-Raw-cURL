@@ -91,7 +91,6 @@ public class ApiSmokeTest {
         logs.append("Response Headers: " + response.getHeaders()).append("\n");
         logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
         logs.append("Response Time: " + response.getTime() + "ms").append("\n\n");
-        int statusCode = response.getStatusCode();
         //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
         return logs.toString();
     }
@@ -130,7 +129,6 @@ public class ApiSmokeTest {
             logs.append("API Status Code: " + response.getStatusCode()).append("\n");
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-            int statusCode = response.getStatusCode();
            // Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
         }
         else {
@@ -168,7 +166,6 @@ public class ApiSmokeTest {
             logs.append("API Status Code: " + response.getStatusCode()).append("\n");
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-            int statusCode = response.getStatusCode();
            // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
         }
         else {
@@ -244,7 +241,6 @@ public class ApiSmokeTest {
             logs.append("API Status Code: " + response.getStatusCode()).append("\n");
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-            int statusCode = response.getStatusCode();
             //Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
         }
         return logs.toString();
@@ -280,7 +276,6 @@ public class ApiSmokeTest {
         logs.append("Response Body "+response.body().asPrettyString()).append("\n");
         logs.append("Response Time "+response.getTime()).append("\n");
         logs.append("Response header "+response.getHeaders()).append("\n");
-        int statusCode = response.getStatusCode();
        // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
         return logs.toString();
     }
@@ -303,7 +298,6 @@ public class ApiSmokeTest {
 
         if (curl.getBody() != null) {
             request.body(curl.getBody());
-        }
 
         Response response = switch (curl.getMethod().toUpperCase()) {
             case "GET" -> request.get(curl.getUrl());
@@ -322,7 +316,10 @@ public class ApiSmokeTest {
         logs.append("Response Headers: " + response.getHeaders()).append("\n");
         logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
         logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-        int statusCode = response.getStatusCode();
+        }
+       else {
+            logs.append("---- This API runs payload-free 🚀.. No Payload Exist. ---");
+        }
        //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401 || statusCode == 403);
         return logs.toString();
     }
