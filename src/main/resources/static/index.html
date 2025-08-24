@@ -1,70 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Curl Parser</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        textarea { width: 100%; height: 150px; }
-        #executeBtn:disabled { background-color: #ccc; cursor: not-allowed; }
-        #logs { white-space: pre-wrap; background: #f4f4f4; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
-        .warning { color: red; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Curl Parser</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 150px; }
+    #executeBtn:disabled { background-color: #ccc; cursor: not-allowed; }
+    #logs { background: #f4f4f4; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
+    .warning { color: red; }
+
+    .section-header {
+      cursor: pointer;
+      background: #e0e0e0;
+      padding: 5px;
+      margin-top: 5px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+    }
+
+    .arrow {
+      display: inline-block;
+      transition: transform 0.2s ease;
+      margin-right: 8px;
+    }
+
+    .arrow.collapsed {
+      transform: rotate(0deg); /* ▶ */
+    }
+
+    .arrow.expanded {
+      transform: rotate(90deg); /* ▼ */
+    }
+
+    .section-body {
+      display: none;
+      white-space: pre-wrap;
+      padding: 5px;
+      border-left: 2px solid #aaa;
+      margin-bottom: 5px;
+      background: #fff;
+    }
+  </style>
 </head>
 <body>
-    <h1>Curl Parser - Test Your API from Raw cURL Instantly ⚡</h1>
-    <p class="warning">Prerequisite: Make sure the cURL API has been first hit via Postman.</p>
+  <h1>Curl Parser - Test Your API from Raw cURL Instantly ⚡</h1>
+  <p class="warning">Prerequisite: Make sure the cURL API has been first hit via Postman.</p>
 
-    <textarea id="curlInput" placeholder="Enter your cURL command here..."></textarea>
-    <br><br>
-    <button id="executeBtn" disabled>Execute</button>
+  <textarea id="curlInput" placeholder="Enter your cURL command here..."></textarea>
+  <br><br>
+  <button id="executeBtn" disabled>Execute</button>
 
-    <h2>Results</h2>
-    <div id="logs"></div>
+  <h2>Results</h2>
+  <div id="logs"></div>
 
-    <script>
-        const curlInput = document.getElementById("curlInput");
-        const executeBtn = document.getElementById("executeBtn");
-        const logs = document.getElementById("logs");
+  <script>
+    const curlInput = document.getElementById("curlInput");
+    const executeBtn = document.getElementById("executeBtn");
+    const logs = document.getElementById("logs");
 
-        function appendLog(message) {
-            logs.textContent += message + "\n";
-            logs.scrollTop = logs.scrollHeight;
+    // ✅ Validation: Enable only if starts with "curl --location "
+    curlInput.addEventListener("input", () => {
+      const trimmed = curlInput.value.trim();
+      executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
+    });
+
+    // Append log with collapsible sections
+    function appendLog(message) {
+      const lines = message.split("\n");
+      let currentSection = null;
+
+      lines.forEach(line => {
+        if (line.startsWith("=== Running")) {
+          // Create header
+          const header = document.createElement("div");
+          header.className = "section-header";
+
+          // Arrow
+          const arrow = document.createElement("span");
+          arrow.className = "arrow collapsed";
+          arrow.textContent = "▶";
+
+          // Text
+          const text = document.createElement("span");
+          text.textContent = line;
+
+          // Body (hidden by default)
+          const body = document.createElement("div");
+          body.className = "section-body";
+
+          // Toggle expand/collapse
+          header.addEventListener("click", () => {
+            const expanded = body.style.display === "block";
+            body.style.display = expanded ? "none" : "block";
+            arrow.textContent = expanded ? "▶" : "▼";
+          });
+
+          header.appendChild(arrow);
+          header.appendChild(text);
+          logs.appendChild(header);
+          logs.appendChild(body);
+
+          currentSection = body;
+        } else {
+          if (currentSection) {
+            currentSection.textContent += line + "\n";
+          } else {
+            logs.textContent += line + "\n";
+          }
         }
+      });
 
-        // Enable button only if input is not empty and starts with "curl --location "
-        curlInput.addEventListener("input", () => {
-            const trimmed = curlInput.value.trim();
-            executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    executeBtn.addEventListener("click", async () => {
+      const curlCommand = curlInput.value.trim();
+
+      // Extra safety check
+      if (!curlCommand.startsWith("curl --location ")) {
+        appendLog("❌ Invalid cURL format. Must start with: curl --location");
+        return;
+      }
+
+      // Disable while waiting for response
+      executeBtn.disabled = true;
+      appendLog("=== Running cURL ===\n" + curlCommand);
+
+      try {
+        const response = await fetch("/api/execute-curl", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: curlCommand
         });
 
-        executeBtn.addEventListener("click", async () => {
-            const curlCommand = curlInput.value.trim();
-
-            // Extra safety validation
-            if (!curlCommand.startsWith("curl --location ")) {
-                appendLog("❌ Invalid cURL format. Must start with: curl --location");
-                return;
-            }
-
-            executeBtn.disabled = true; // disable until response
-            appendLog("=== Executing cURL ===\n" + curlCommand);
-
-            try {
-                const response = await fetch("/api/execute-curl", {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain" },
-                    body: curlCommand
-                });
-
-                const text = await response.text();
-                appendLog("=== Response ===\n" + text);
-            } catch (err) {
-                appendLog("❌ Error: " + err.message);
-            } finally {
-                executeBtn.disabled = false; // re-enable button
-            }
-        });
-    </script>
+        const text = await response.text();
+        appendLog("=== Running Response ===\n" + text);
+      } catch (err) {
+        appendLog("❌ Error: " + err.message);
+      } finally {
+        // Re-enable only if input is still valid
+        const trimmed = curlInput.value.trim();
+        executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
+      }
+    });
+  </script>
 </body>
 </html>
