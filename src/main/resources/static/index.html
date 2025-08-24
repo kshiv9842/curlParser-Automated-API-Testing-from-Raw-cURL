@@ -126,7 +126,7 @@
 
       // Disable while waiting for response
       executeBtn.disabled = true;
-      appendLog("=== Running cURL ===\n" + curlCommand);
+      appendLog("=== Executing cURL .....\n" + curlCommand);
 
       try {
         const response = await fetch("/api/execute-curl", {
@@ -136,7 +136,7 @@
         });
 
         const text = await response.text();
-        //appendLog("=== Running Response ===\n" + text);
+        appendLog("=== Reults ===\n\n" + text);
       } catch (err) {
         appendLog("❌ Error: " + err.message);
       } finally {
