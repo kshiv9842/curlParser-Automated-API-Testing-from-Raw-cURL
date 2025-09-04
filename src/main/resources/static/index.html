@@ -170,7 +170,7 @@
       }
 
       executeBtn.disabled = true;
-      appendLog("=== Running Execution ===\n" + curlCommand);
+      appendLog("=== Test Execution Started ===\n" + curlCommand);
 
       try {
         const response = await fetch("/api/execute-curl", {
