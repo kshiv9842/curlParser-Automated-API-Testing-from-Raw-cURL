@@ -4,7 +4,6 @@ import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.json.JSONObject;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -12,7 +11,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class ApiSmokeTest {
-   // @Test
+    // @Test
     public static String runBasicSmokeTest(String curlCommand) {
         StringBuilder logs = new StringBuilder();
 
@@ -44,7 +43,7 @@ public class ApiSmokeTest {
         logs.append("API Status Code: " + response.getStatusCode()).append("\n");
         logs.append("Response Time: " + response.getTime() + "ms").append("\n");
 
-       // Assert.assertTrue(response.getStatusCode() < 500, "Server error occurred");
+        // Assert.assertTrue(response.getStatusCode() < 500, "Server error occurred");
 
         if (response.getContentType().contains("json")) {
             try {
@@ -52,11 +51,19 @@ public class ApiSmokeTest {
                 logs.append("Response Body Format: Valid JSON").append("\n");
             } catch (Exception e) {
                 logs.append("Response Body Format: Invalid JSON").append("\n");
-               // Assert.fail("Invalid JSON response");
+                // Assert.fail("Invalid JSON response");
             }
         }
         logs.append("Response Body:").append("\n\n");
         logs.append(response.getBody().asPrettyString()).append("\n\n");
+
+        boolean passed = response.getStatusCode() < 500;
+        if (passed) {
+            logs.append("Passed");
+        } else {
+            logs.append("Failed");
+        }
+
         //Assert.assertEquals(response.getStatusCode(),200);
         return logs.toString();
     }
@@ -92,10 +99,16 @@ public class ApiSmokeTest {
         logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
         logs.append("Response Time: " + response.getTime() + "ms").append("\n\n");
         //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
+        boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+        if (passed) {
+            logs.append("Passed");
+        } else {
+            logs.append("Failed");
+        }
         return logs.toString();
     }
 
-   // @Test
+    // @Test
     public static String runNegativeTestRemoveAuth(String curlCommand){
         StringBuilder logs = new StringBuilder();
 
@@ -129,15 +142,22 @@ public class ApiSmokeTest {
             logs.append("API Status Code: " + response.getStatusCode()).append("\n");
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-           // Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
+            // Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
+            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         }
         else {
             logs.append("---- Auth not Exist. ----").append("\n\n");
+            logs.append("Test Case Skipped.");
         }
         return logs.toString();
     }
 
-   // @Test
+    // @Test
     public static String runNegativeTestRemoveBody(String curlCommand) {
         StringBuilder logs = new StringBuilder();
 
@@ -166,15 +186,22 @@ public class ApiSmokeTest {
             logs.append("API Status Code: " + response.getStatusCode()).append("\n");
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
-           // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
+            // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
+            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         }
         else {
             logs.append("---- API don't have body. ----").append("\n\n");
+            logs.append("Test Case Skipped.");
         }
         return logs.toString();
     }
 
-   // @Test
+    // @Test
     public static String runNegativeTestUpdatePathParam(String curlCommand) throws MalformedURLException {
         StringBuilder logs = new StringBuilder();
         ParsedCurl curl = CurlParser.parseCurl(curlCommand);
@@ -187,6 +214,7 @@ public class ApiSmokeTest {
         logs.append("Path Param List - " + curl.getPathParams()).append("\n\n");
         if (curl.getPathParams() == null||curl.getPathParams().isEmpty()) {
             logs.append("---- Path Param Not Exist ----").append("\n\n");
+            logs.append("Test Case Skipped.");
             //request.pathParam(curl.getPathParams().toString(),true);
         } else {
             originalUrl = curl.getUrl();
@@ -242,11 +270,17 @@ public class ApiSmokeTest {
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
             //Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
+            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         }
         return logs.toString();
     }
 
-   // @Test
+    // @Test
     public static String runNegativeUnsupportedMethod(String curlcommand){
         StringBuilder logs = new StringBuilder();
         ParsedCurl curl = CurlParser.parseCurl(curlcommand);
@@ -257,7 +291,7 @@ public class ApiSmokeTest {
             if(curl.getMethod().equals("GET"))
                 curl.setMethod("POST");
             else
-               curl.setMethod("GET");
+                curl.setMethod("GET");
         }
         if(curl.getBody()!=null)
             request.body(curl.getBody());
@@ -272,11 +306,17 @@ public class ApiSmokeTest {
 
         logs.append("=== Smoke Test Results ====").append("\n\n");
         logs.append("- Request Headers: "+curl.getHeaders()).append("\n");
-        logs.append("Response Status Code "+response.getStatusCode()).append("\n");
+        logs.append("API Status Code: "+response.getStatusCode()).append("\n");
         logs.append("Response Body "+response.body().asPrettyString()).append("\n");
         logs.append("Response Time "+response.getTime()).append("\n");
         logs.append("Response header "+response.getHeaders()).append("\n");
-       // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
+        // Assert.assertTrue(statusCode==400 ||statusCode==404||statusCode==401);
+        boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+        if (passed) {
+            logs.append("Passed");
+        } else {
+            logs.append("Failed");
+        }
         return logs.toString();
     }
 
@@ -299,28 +339,36 @@ public class ApiSmokeTest {
         if (curl.getBody() != null) {
             request.body(curl.getBody());
 
-        Response response = switch (curl.getMethod().toUpperCase()) {
-            case "GET" -> request.get(curl.getUrl());
-            case "POST" -> request.get(curl.getUrl());
-            case "PUT" -> request.get(curl.getUrl());
-            case "DELETE" -> request.get(curl.getUrl());
-            default -> throw new IllegalArgumentException("Unsupported HTTP method: " + curl.getMethod());
-        };
+            Response response = switch (curl.getMethod().toUpperCase()) {
+                case "GET" -> request.get(curl.getUrl());
+                case "POST" -> request.get(curl.getUrl());
+                case "PUT" -> request.get(curl.getUrl());
+                case "DELETE" -> request.get(curl.getUrl());
+                default -> throw new IllegalArgumentException("Unsupported HTTP method: " + curl.getMethod());
+            };
 
-        logs.append("=== Smoke Test Results ===").append("\n\n");
-        logs.append("- Request Headers - " + curl.getHeaders()).append("\n");
-        logs.append("- Request Method - " + curl.getMethod()).append("\n");
-        logs.append("- Request URL - " + curl.getUrl()).append("\n");
-        logs.append("- Request Body - " + curl.getBody()).append("\n");
-        logs.append("API Status Code: " + response.getStatusCode()).append("\n");
-        logs.append("Response Headers: " + response.getHeaders()).append("\n");
-        logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
-        logs.append("Response Time: " + response.getTime() + "ms").append("\n");
+            logs.append("=== Smoke Test Results ===").append("\n\n");
+            logs.append("- Request Headers - " + curl.getHeaders()).append("\n");
+            logs.append("- Request Method - " + curl.getMethod()).append("\n");
+            logs.append("- Request URL - " + curl.getUrl()).append("\n");
+            logs.append("- Request Body - " + curl.getBody()).append("\n");
+            logs.append("API Status Code: " + response.getStatusCode()).append("\n");
+            logs.append("Response Headers: " + response.getHeaders()).append("\n");
+            logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
+            logs.append("Response Time: " + response.getTime() + "ms").append("\n");
+
+            boolean passed = (response.getStatusCode() == 400 || response.getStatusCode() == 404 || response.getStatusCode() == 401);
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         }
-       else {
+        else {
             logs.append("---- This API runs payload-free 🚀.. No Payload Exist. ---");
+            logs.append("Test Case Skipped.");
         }
-       //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401 || statusCode == 403);
+        //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401 || statusCode == 403);
         return logs.toString();
     }
 }
