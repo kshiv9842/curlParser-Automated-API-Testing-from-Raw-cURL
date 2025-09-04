@@ -1,116 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Curl Parser</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    textarea { width: 100%; height: 150px; }
-    #executeBtn:disabled { background-color: #ccc; cursor: not-allowed; }
-    #logs { background: #f4f4f4; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
-    .warning { color: red; }
+    <meta charset="UTF-8">
+    <title>Curl Parser</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        textarea { width: 100%; height: 150px; }
+        #executeBtn:disabled { background-color: #ccc; cursor: not-allowed; }
+        #logs { background: #f4f4f4; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
+        .warning { color: red; }
 
-    .section-header {
-      cursor: pointer;
-      background: #e0e0e0;
-      padding: 5px;
-      margin-top: 5px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-    }
+        .section-header {
+          cursor: pointer;
+          background: #e0e0e0;
+          padding: 5px;
+          margin-top: 5px;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+        }
 
-    .arrow {
-      display: inline-block;
-      transition: transform 0.2s ease;
-      margin-right: 8px;
-    }
+        .arrow {
+          display: inline-block;
+          transition: transform 0.2s ease;
+          margin-right: 8px;
+        }
 
-    .arrow.collapsed {
-      transform: rotate(0deg); /* ▶ */
-    }
+        .arrow.collapsed {
+          transform: rotate(0deg); /* ▶ */
+        }
 
-    .arrow.expanded {
-      transform: rotate(90deg); /* ▼ */
-    }
+        .arrow.expanded {
+          transform: rotate(90deg); /* ▼ */
+        }
 
-    .section-body {
-      display: none;
-      white-space: pre-wrap;
-      padding: 5px;
-      border-left: 2px solid #aaa;
-      margin-bottom: 5px;
-      background: #fff;
-    }
-  </style>
+        .section-body {
+          display: none;
+          white-space: pre-wrap;
+          padding: 5px;
+          border-left: 2px solid #aaa;
+          margin-bottom: 5px;
+          background: #fff;
+        }
+    </style>
 </head>
 <body>
-  <h1>Curl Parser - Test Your API from Raw cURL Instantly ⚡</h1>
-  <p class="warning">Prerequisite: Make sure the cURL API has been first hit via Postman.</p>
+<h1>Curl Parser - Test Your API from Raw cURL Instantly ⚡</h1>
+<p class="warning">Prerequisite: Make sure the cURL API has been first hit via Postman.</p>
 
-  <textarea id="curlInput" placeholder="Enter your cURL command here..."></textarea>
-  <br><br>
-  <button id="executeBtn" disabled>Execute</button>
+<textarea id="curlInput" placeholder="Enter your cURL command here..."></textarea>
+<br><br>
+<button id="executeBtn" disabled>Execute</button>
 
-  <h2>Results</h2>
-  <div id="logs"></div>
-
-  <script>
+<h2>Results</h2>
+<div id="logs"></div>
+<script>
     const curlInput = document.getElementById("curlInput");
     const executeBtn = document.getElementById("executeBtn");
     const logs = document.getElementById("logs");
 
-    // ✅ Validation: Enable only if starts with "curl --location "
     curlInput.addEventListener("input", () => {
       const trimmed = curlInput.value.trim();
       executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
     });
 
-    // Append log with collapsible sections
+    // ✅ Highlight lines inside a block based on block result
+    function highlightBlock(blockLines) {
+      let blockColor = "red"; // default = failed
+      if (blockLines.some(l => l.includes("Passed"))) {
+        blockColor = "green";
+      } else if (blockLines.some(l => l.includes("Test Case Skipped"))) {
+        blockColor = "orange";
+      }
+
+      return blockLines.map((line, idx) => {
+        let highlighted = line;
+
+        // highlight status code with block color
+        highlighted = highlighted.replace(/API Status Code:\s*(\d+)/g, (match, code) => {
+          return `API Status Code: <span style="color:${blockColor}; font-weight:bold">${code}</span>`;
+        });
+
+        // highlight keywords
+        highlighted = highlighted
+          .replace(/\bPassed\b/g, `<span style="color:green; font-weight:bold">Passed</span>`)
+          .replace(/\bFailed\b/g, `<span style="color:red; font-weight:bold">Failed</span>`)
+          .replace(/Test Case Skipped/g, `<span style="color:orange; font-weight:bold">Test Case Skipped</span>`);
+
+        // if header line, append status at the end
+        if (idx === 0 && line.startsWith("=== Running")) {
+          let statusText = "";
+          if (blockColor === "green") statusText = " ✅ Passed";
+          else if (blockColor === "red") statusText = " ❌ Failed";
+          else if (blockColor === "orange") statusText = " ⚠️ Skipped";
+
+          highlighted += ` <span style="color:${blockColor}; font-weight:bold">${statusText}</span>`;
+        }
+
+        return highlighted;
+      });
+    }
+
     function appendLog(message) {
       const lines = message.split("\n");
-      let currentSection = null;
+      let currentBlock = [];
+
+      function flushBlock() {
+        if (currentBlock.length === 0) return;
+        const highlightedLines = highlightBlock(currentBlock);
+
+        let currentSection = null;
+        highlightedLines.forEach((line, idx) => {
+          if (idx === 0 && line.startsWith("=== Running")) {
+            const header = document.createElement("div");
+            header.className = "section-header";
+
+            const arrow = document.createElement("span");
+            arrow.className = "arrow collapsed";
+            arrow.textContent = "▶";
+
+            const text = document.createElement("span");
+            text.innerHTML = line;
+
+            const body = document.createElement("div");
+            body.className = "section-body";
+
+            header.addEventListener("click", () => {
+              const expanded = body.style.display === "block";
+              body.style.display = expanded ? "none" : "block";
+              arrow.textContent = expanded ? "▶" : "▼";
+            });
+
+            header.appendChild(arrow);
+            header.appendChild(text);
+            logs.appendChild(header);
+            logs.appendChild(body);
+
+            currentSection = body;
+          } else {
+            if (currentSection) {
+              currentSection.innerHTML += line + "<br>";
+            } else {
+              logs.innerHTML += line + "<br>";
+            }
+          }
+        });
+        currentBlock = [];
+      }
 
       lines.forEach(line => {
         if (line.startsWith("=== Running")) {
-          // Create header
-          const header = document.createElement("div");
-          header.className = "section-header";
-
-          // Arrow
-          const arrow = document.createElement("span");
-          arrow.className = "arrow collapsed";
-          arrow.textContent = "▶";
-
-          // Text
-          const text = document.createElement("span");
-          text.textContent = line;
-
-          // Body (hidden by default)
-          const body = document.createElement("div");
-          body.className = "section-body";
-
-          // Toggle expand/collapse
-          header.addEventListener("click", () => {
-            const expanded = body.style.display === "block";
-            body.style.display = expanded ? "none" : "block";
-            arrow.textContent = expanded ? "▶" : "▼";
-          });
-
-          header.appendChild(arrow);
-          header.appendChild(text);
-          logs.appendChild(header);
-          logs.appendChild(body);
-
-          currentSection = body;
+          flushBlock(); // finish previous block
+          currentBlock.push(line);
         } else {
-          if (currentSection) {
-            currentSection.textContent += line + "\n";
-          } else {
-            logs.textContent += line + "\n";
-          }
+          currentBlock.push(line);
         }
       });
+      flushBlock(); // flush last block
 
       logs.scrollTop = logs.scrollHeight;
     }
@@ -118,15 +164,13 @@
     executeBtn.addEventListener("click", async () => {
       const curlCommand = curlInput.value.trim();
 
-      // Extra safety check
       if (!curlCommand.startsWith("curl --location ")) {
         appendLog("❌ Invalid cURL format. Must start with: curl --location");
         return;
       }
 
-      // Disable while waiting for response
       executeBtn.disabled = true;
-      appendLog("=== Executing cURL .....\n" + curlCommand);
+      appendLog("=== Running Execution ===\n" + curlCommand);
 
       try {
         const response = await fetch("/api/execute-curl", {
@@ -136,15 +180,15 @@
         });
 
         const text = await response.text();
-        appendLog("=== Reults ===\n\n" + text);
+        appendLog(text);
       } catch (err) {
         appendLog("❌ Error: " + err.message);
       } finally {
-        // Re-enable only if input is still valid
         const trimmed = curlInput.value.trim();
         executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
       }
     });
-  </script>
+</script>
+
 </body>
 </html>
