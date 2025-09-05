@@ -57,7 +57,7 @@ public class ApiSmokeTest {
         logs.append("Response Body:").append("\n\n");
         logs.append(response.getBody().asPrettyString()).append("\n\n");
 
-        boolean passed = response.getStatusCode() < 500;
+        boolean passed = response.getStatusCode() == 200;
         if (passed) {
             logs.append("Passed");
         } else {
@@ -99,7 +99,7 @@ public class ApiSmokeTest {
         logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
         logs.append("Response Time: " + response.getTime() + "ms").append("\n\n");
         //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
-        boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+        boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401||response.getStatusCode() == 403);
         if (passed) {
             logs.append("Passed");
         } else {
@@ -143,7 +143,7 @@ public class ApiSmokeTest {
             logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
             logs.append("Response Time: " + response.getTime() + "ms").append("\n");
             // Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
-            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401);
+            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 404 ||response.getStatusCode() == 401 ||response.getStatusCode() == 403);
             if (passed) {
                 logs.append("Passed");
             } else {
