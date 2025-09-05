@@ -165,10 +165,12 @@
       const curlCommand = curlInput.value.trim();
 
       if (!curlCommand.startsWith("curl --location ")) {
+        logs.innerHTML = ""; // ✅ clear old results
         appendLog("❌ Invalid cURL format. Must start with: curl --location");
         return;
       }
 
+      logs.innerHTML = ""; // ✅ clear old results before new run
       executeBtn.disabled = true;
       appendLog("=== Test Execution Started ===\n" + curlCommand);
 
@@ -189,6 +191,5 @@
       }
     });
 </script>
-
 </body>
 </html>
