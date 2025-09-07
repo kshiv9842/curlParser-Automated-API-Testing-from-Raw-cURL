@@ -26,13 +26,8 @@
           margin-right: 8px;
         }
 
-        .arrow.collapsed {
-          transform: rotate(0deg); /* ▶ */
-        }
-
-        .arrow.expanded {
-          transform: rotate(90deg); /* ▼ */
-        }
+        .arrow.collapsed { transform: rotate(0deg); }
+        .arrow.expanded { transform: rotate(90deg); }
 
         .section-body {
           display: none;
@@ -41,6 +36,26 @@
           border-left: 2px solid #aaa;
           margin-bottom: 5px;
           background: #fff;
+        }
+
+        /* 🔄 Loader Styles */
+        #loader {
+          display: none;
+          margin-top: 10px;
+          text-align: center;
+        }
+        .spinner {
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #3498db;
+          border-radius: 50%;
+          width: 30px;
+          height: 30px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -52,21 +67,27 @@
 <br><br>
 <button id="executeBtn" disabled>Execute</button>
 
+<!-- 🔄 Loader element -->
+<div id="loader">
+    <div class="spinner"></div>
+    <p>Executing request, please wait...</p>
+</div>
+
 <h2>Results</h2>
 <div id="logs"></div>
 <script>
     const curlInput = document.getElementById("curlInput");
     const executeBtn = document.getElementById("executeBtn");
     const logs = document.getElementById("logs");
+    const loader = document.getElementById("loader");
 
     curlInput.addEventListener("input", () => {
       const trimmed = curlInput.value.trim();
       executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
     });
 
-    // ✅ Highlight lines inside a block based on block result
     function highlightBlock(blockLines) {
-      let blockColor = "red"; // default = failed
+      let blockColor = "red";
       if (blockLines.some(l => l.includes("Passed"))) {
         blockColor = "green";
       } else if (blockLines.some(l => l.includes("Test Case Skipped"))) {
@@ -76,18 +97,15 @@
       return blockLines.map((line, idx) => {
         let highlighted = line;
 
-        // highlight status code with block color
         highlighted = highlighted.replace(/API Status Code:\s*(\d+)/g, (match, code) => {
           return `API Status Code: <span style="color:${blockColor}; font-weight:bold">${code}</span>`;
         });
 
-        // highlight keywords
         highlighted = highlighted
           .replace(/\bPassed\b/g, `<span style="color:green; font-weight:bold">Passed</span>`)
           .replace(/\bFailed\b/g, `<span style="color:red; font-weight:bold">Failed</span>`)
           .replace(/Test Case Skipped/g, `<span style="color:orange; font-weight:bold">Test Case Skipped</span>`);
 
-        // if header line, append status at the end
         if (idx === 0 && line.startsWith("=== Running")) {
           let statusText = "";
           if (blockColor === "green") statusText = " ✅ Passed";
@@ -109,55 +127,48 @@
         if (currentBlock.length === 0) return;
         const highlightedLines = highlightBlock(currentBlock);
 
-        let currentSection = null;
-        highlightedLines.forEach((line, idx) => {
-          if (idx === 0 && line.startsWith("=== Running")) {
-            const header = document.createElement("div");
-            header.className = "section-header";
+        // always create a new collapsible block for "=== Running"
+        const header = document.createElement("div");
+        header.className = "section-header";
 
-            const arrow = document.createElement("span");
-            arrow.className = "arrow collapsed";
-            arrow.textContent = "▶";
+        const arrow = document.createElement("span");
+        arrow.className = "arrow collapsed";
+        arrow.textContent = "▶";
 
-            const text = document.createElement("span");
-            text.innerHTML = line;
+        const text = document.createElement("span");
+        text.innerHTML = highlightedLines[0]; // block header
 
-            const body = document.createElement("div");
-            body.className = "section-body";
+        const body = document.createElement("div");
+        body.className = "section-body";
 
-            header.addEventListener("click", () => {
-              const expanded = body.style.display === "block";
-              body.style.display = expanded ? "none" : "block";
-              arrow.textContent = expanded ? "▶" : "▼";
-            });
-
-            header.appendChild(arrow);
-            header.appendChild(text);
-            logs.appendChild(header);
-            logs.appendChild(body);
-
-            currentSection = body;
-          } else {
-            if (currentSection) {
-              currentSection.innerHTML += line + "<br>";
-            } else {
-              logs.innerHTML += line + "<br>";
-            }
-          }
+        header.addEventListener("click", () => {
+          const expanded = body.style.display === "block";
+          body.style.display = expanded ? "none" : "block";
+          arrow.textContent = expanded ? "▶" : "▼";
         });
+
+        header.appendChild(arrow);
+        header.appendChild(text);
+        logs.appendChild(header);
+        logs.appendChild(body);
+
+        highlightedLines.slice(1).forEach(line => {
+          body.innerHTML += line + "<br>";
+        });
+
         currentBlock = [];
       }
 
       lines.forEach(line => {
         if (line.startsWith("=== Running")) {
-          flushBlock(); // finish previous block
+          flushBlock();
           currentBlock.push(line);
         } else {
           currentBlock.push(line);
         }
       });
-      flushBlock(); // flush last block
 
+      flushBlock();
       logs.scrollTop = logs.scrollHeight;
     }
 
@@ -165,14 +176,27 @@
       const curlCommand = curlInput.value.trim();
 
       if (!curlCommand.startsWith("curl --location ")) {
-        logs.innerHTML = ""; // ✅ clear old results
         appendLog("❌ Invalid cURL format. Must start with: curl --location");
         return;
       }
 
-      logs.innerHTML = ""; // ✅ clear old results before new run
       executeBtn.disabled = true;
-      appendLog("=== Test Execution Started ===\n" + curlCommand);
+      loader.style.display = "block"; // show loader
+      logs.innerHTML = ""; // clear old logs
+
+      // ✅ Show Execution Starts as plain text (not collapsible)
+      const execStart = document.createElement("div");
+      execStart.style.fontWeight = "bold";
+      execStart.style.marginBottom = "10px";
+      execStart.textContent = "🚀 Execution Starts...";
+      logs.appendChild(execStart);
+
+      const curlCmdBlock = document.createElement("pre");
+      curlCmdBlock.textContent = curlCommand;
+      curlCmdBlock.style.background = "#fff";
+      curlCmdBlock.style.padding = "5px";
+      curlCmdBlock.style.border = "1px solid #ddd";
+      logs.appendChild(curlCmdBlock);
 
       try {
         const response = await fetch("/api/execute-curl", {
@@ -183,13 +207,23 @@
 
         const text = await response.text();
         appendLog(text);
+
+        // ✅ Show Execution Finished
+        const execEnd = document.createElement("div");
+        execEnd.style.fontWeight = "bold";
+        execEnd.style.marginTop = "10px";
+        execEnd.textContent = "🏁 Execution Finished";
+        logs.appendChild(execEnd);
+
       } catch (err) {
         appendLog("❌ Error: " + err.message);
       } finally {
+        loader.style.display = "none"; // hide loader
         const trimmed = curlInput.value.trim();
         executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
       }
     });
 </script>
+
 </body>
 </html>
