@@ -26,13 +26,24 @@ public class ApiSmokeTest {
         if (curl.getBody() != null) {
             request.body(curl.getBody());
         }
-        Response response = switch (curl.getMethod().toUpperCase()) {
+        Response response =null;
+        try{
+        response = switch (curl.getMethod().toUpperCase()) {
             case "GET" -> request.get(curl.getUrl());
             case "POST" -> request.post(curl.getUrl());
             case "PUT" -> request.put(curl.getUrl());
             case "DELETE" -> request.delete(curl.getUrl());
             default -> throw new IllegalArgumentException("Unsupported HTTP method: " + curl.getMethod());
         };
+        }
+        catch(Exception e){
+         System.err.println("API/network error: " + e.getMessage());
+        logs.append("API/network error: ").append(e.getMessage()).append("\n");
+        // Optionally, add stack trace
+        java.io.StringWriter sw = new java.io.StringWriter();
+        e.printStackTrace(new java.io.PrintWriter(sw));
+        logs.append(sw.toString()).append("\n");
+    }
 
         logs.append("=== Smoke Test Results ===").append("\n\n\n");
         logs.append("- Request Headers - "+curl.getHeaders()).append("\n");
