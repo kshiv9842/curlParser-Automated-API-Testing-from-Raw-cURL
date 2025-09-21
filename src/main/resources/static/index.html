@@ -83,7 +83,7 @@
 
     curlInput.addEventListener("input", () => {
       const trimmed = curlInput.value.trim();
-      executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
+      executeBtn.disabled = !(trimmed && trimmed.startsWith("curl"));
     });
 
     function highlightBlock(blockLines) {
@@ -175,8 +175,8 @@
     executeBtn.addEventListener("click", async () => {
       const curlCommand = curlInput.value.trim();
 
-      if (!curlCommand.startsWith("curl --location ")) {
-        appendLog("❌ Invalid cURL format. Must start with: curl --location");
+      if (!curlCommand.startsWith("curl")) {
+        appendLog("❌ Invalid cURL format. Must start with: curl");
         return;
       }
 
@@ -184,7 +184,6 @@
       loader.style.display = "block"; // show loader
       logs.innerHTML = ""; // clear old logs
 
-      // ✅ Show Execution Starts as plain text (not collapsible)
       const execStart = document.createElement("div");
       execStart.style.fontWeight = "bold";
       execStart.style.marginBottom = "10px";
@@ -208,7 +207,6 @@
         const text = await response.text();
         appendLog(text);
 
-        // ✅ Show Execution Finished
         const execEnd = document.createElement("div");
         execEnd.style.fontWeight = "bold";
         execEnd.style.marginTop = "10px";
@@ -220,7 +218,7 @@
       } finally {
         loader.style.display = "none"; // hide loader
         const trimmed = curlInput.value.trim();
-        executeBtn.disabled = !(trimmed && trimmed.startsWith("curl --location "));
+        executeBtn.disabled = !(trimmed && trimmed.startsWith("curl"));
       }
     });
 </script>
