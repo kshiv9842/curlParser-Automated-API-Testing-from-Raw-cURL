@@ -40,6 +40,38 @@ public class CurlController {
                 .append("Expected: API should return 404 (Not Found)\n\n");
         logs.append(ApiSmokeTest.runNegativeTestUpdatePathParam(curlCommand)).append("\n\n");
 
+        logs.append("=== Running Negative Test: Invalid Query Parameters (Tests API response to malformed query strings) ===\n")
+                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestInvalidQueryParams(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Negative Test: Missing Query Parameters (Tests API response when required query params are removed) ===\n")
+                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestMissingQueryParams(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Negative Test: Wrong Content-Type (Tests API response to incorrect media type) ===\n")
+                .append("Expected: API should return 400 or 415 (Bad Request / Unsupported Media Type)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestWrongContentType(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Negative Test: Malformed JSON (Tests API response to invalid JSON syntax) ===\n")
+                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestMalformedJson(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Negative Test: Oversized Payload (Tests API response to extremely large payloads) ===\n")
+                .append("Expected: API should return 413 or 400 (Payload Too Large / Bad Request)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestOversizedPayload(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Security Test: SQL Injection (Tests API response to SQL injection patterns) ===\n")
+                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestSqlInjection(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Edge Case Test: Special Characters (Tests API response to Unicode and special chars) ===\n")
+                .append("Expected: API should return 200 or 400 (Success or Bad Request)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestSpecialCharacters(curlCommand)).append("\n\n");
+
+        logs.append("=== Running Edge Case Test: Empty Values (Tests API response to empty/null field values) ===\n")
+                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
+        logs.append(ApiSmokeTest.runNegativeTestEmptyValues(curlCommand)).append("\n\n");
+
         return logs.toString();
     }
 }
