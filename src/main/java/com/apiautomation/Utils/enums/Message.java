@@ -1,5 +1,4 @@
 package com.apiautomation.Utils.enums;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 //@AllArgsConstructor
