@@ -1,5 +1,4 @@
 package com.apiautomation;
-
 import com.google.gson.*;
 import java.util.*;
 
