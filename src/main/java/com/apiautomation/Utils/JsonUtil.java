@@ -3,7 +3,6 @@ package com.apiautomation.Utils;
 import static com.google.common.reflect.TypeToken.of;
 import static com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES;
 import static com.apiautomation.Utils.ErrorHandler.handleAndThrow;
-import static java.lang.Enum.valueOf;
 import static org.apache.logging.log4j.LogManager.getLogger;
 
 import java.io.FileNotFoundException;
