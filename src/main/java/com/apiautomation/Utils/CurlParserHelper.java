@@ -1,5 +1,4 @@
 package com.apiautomation.Utils;
-
 import com.apiautomation.ParsedCurl;
 import com.apiautomation.PayloadMutator;
 import java.util.*;
