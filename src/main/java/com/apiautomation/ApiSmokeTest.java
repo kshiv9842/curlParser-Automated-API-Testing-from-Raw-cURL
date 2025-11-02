@@ -1,6 +1,8 @@
 package com.apiautomation;
 
 import io.restassured.RestAssured;
+import io.restassured.config.EncoderConfig;
+import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import com.apiautomation.Utils.SqlInjectionHelper;
@@ -14,9 +16,43 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class ApiSmokeTest {
+    
+    /**
+     * Configure RestAssured with proper encoding for different content types
+     */
+    private static void configureRestAssuredEncoding() {
+        RestAssured.config = RestAssured.config()
+            .encoderConfig(EncoderConfig.encoderConfig()
+                .encodeContentTypeAs("application/json", ContentType.JSON)
+                .encodeContentTypeAs("application/xml", ContentType.XML)
+                .encodeContentTypeAs("text/plain", ContentType.TEXT)
+                .encodeContentTypeAs("application/x-www-form-urlencoded", ContentType.URLENC)
+                .encodeContentTypeAs("multipart/form-data", ContentType.MULTIPART));
+    }
+    
+    /**
+     * Safely encode body content to prevent encoding errors
+     */
+    private static String encodeBodySafely(Object body) {
+        if (body == null) {
+            return null;
+        }
+        
+        // If it's already a string, return as is
+        if (body instanceof String) {
+            return (String) body;
+        }
+        
+        // Convert other types to string
+        return body.toString();
+    }
+    
     // @Test
     public static String runBasicSmokeTest(String curlCommand) {
         StringBuilder logs = new StringBuilder();
+        
+        // Configure RestAssured encoding
+        configureRestAssuredEncoding();
 
         ParsedCurl curl = CurlParser.parseCurl(curlCommand);
         RequestSpecification request = RestAssured.given();
@@ -27,7 +63,9 @@ public class ApiSmokeTest {
         }
 
         if (curl.getBody() != null) {
-            request.body(curl.getBody());
+            // Safely encode body to prevent encoding errors
+            String bodyString = encodeBodySafely(curl.getBody());
+            request.body(bodyString);
         }
         Response response =null;
         try {
@@ -53,40 +91,53 @@ public class ApiSmokeTest {
         System.out.println("- Request Headers - "+curl.getHeaders());
         System.out.println("- Request Body - "+curl.getBody());
         System.out.println("- Request Path Param - "+curl.getPathParams());
-        System.out.println("Reponse URL: " + curl.getUrl());
+        System.out.println("Response URL: " + curl.getUrl());
         System.out.println("Response Method: " + curl.getMethod());
-        System.out.println("API Status Code: " + response.getStatusCode());
-        System.out.println("Response Time: " + response.getTime() + "ms");
-
+        if (response != null) {
+            System.out.println("API Status Code: " + response.getStatusCode());
+            System.out.println("Response Time: " + response.getTime() + "ms");
+        } else {
+            System.out.println("API Status Code: No response received");
+            System.out.println("Response Time: N/A");
+        }
 
         logs.append("=== Smoke Test Results ===").append("\n\n\n");
         logs.append("- Request Headers - "+curl.getHeaders()).append("\n");
         logs.append("- Request Body - "+curl.getBody()).append("\n");
         logs.append("- Request Path Param - "+curl.getPathParams()).append("\n");
-        logs.append("Reponse URL: " + curl.getUrl()).append("\n");
+        logs.append("Response URL: " + curl.getUrl()).append("\n");
         logs.append("Response Method: " + curl.getMethod()).append("\n");
-        logs.append("API Status Code: " + response.getStatusCode()).append("\n");
-        logs.append("Response Time: " + response.getTime() + "ms").append("\n");
+        if (response != null) {
+            logs.append("API Status Code: " + response.getStatusCode()).append("\n");
+            logs.append("Response Time: " + response.getTime() + "ms").append("\n");
+        } else {
+            logs.append("API Status Code: No response received").append("\n");
+            logs.append("Response Time: N/A").append("\n");
+        }
 
         // Assert.assertTrue(response.getStatusCode() < 500, "Server error occurred");
 
-        if (response.getContentType().contains("json")) {
-            try {
-                new JSONObject(response.getBody().asString());
-                logs.append("Response Body Format: Valid JSON").append("\n");
-            } catch (Exception e) {
-                logs.append("Response Body Format: Invalid JSON").append("\n");
-                // Assert.fail("Invalid JSON response");
+        if (response != null) {
+            if (response.getContentType().contains("json")) {
+                try {
+                    new JSONObject(response.getBody().asString());
+                    logs.append("Response Body Format: Valid JSON").append("\n");
+                } catch (Exception e) {
+                    logs.append("Response Body Format: Invalid JSON").append("\n");
+                    // Assert.fail("Invalid JSON response");
+                }
             }
-        }
-        logs.append("Response Body:").append("\n\n");
-        logs.append(response.getBody().asPrettyString()).append("\n\n");
+            logs.append("Response Body:").append("\n\n");
+            logs.append(response.getBody().asPrettyString()).append("\n\n");
 
-        boolean passed = response.getStatusCode() == 200;
-        if (passed) {
-            logs.append("Passed");
+            boolean passed = response.getStatusCode() == 200;
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         } else {
-            logs.append("Failed");
+            logs.append("No response received - Test Failed");
         }
 
         //Assert.assertEquals(response.getStatusCode(),200);
@@ -130,16 +181,25 @@ public class ApiSmokeTest {
         logs.append("- Request Method - " + curl.getMethod()).append("\n");
         logs.append("- Request URL - " + curl.getUrl()).append("\n");
         logs.append("- Request Body - " + curl.getBody()).append("\n");
-        logs.append("API Status Code: " + response.getStatusCode()).append("\n");
-        logs.append("Response Headers: " + response.getHeaders()).append("\n");
-        logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
-        logs.append("Response Time: " + response.getTime() + "ms").append("\n\n");
-        //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
-        boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 401);
-        if (passed) {
-            logs.append("Passed");
+        
+        if (response != null) {
+            logs.append("API Status Code: " + response.getStatusCode()).append("\n");
+            logs.append("Response Headers: " + response.getHeaders()).append("\n");
+            logs.append("Response Body: " + response.body().asPrettyString()).append("\n");
+            logs.append("Response Time: " + response.getTime() + "ms").append("\n\n");
+            //Assert.assertTrue(statusCode == 400 || statusCode == 404 || statusCode == 401);
+            boolean passed = (response.getStatusCode() == 400 ||response.getStatusCode() == 401);
+            if (passed) {
+                logs.append("Passed");
+            } else {
+                logs.append("Failed");
+            }
         } else {
-            logs.append("Failed");
+            logs.append("API Status Code: No response received").append("\n");
+            logs.append("Response Headers: N/A").append("\n");
+            logs.append("Response Body: N/A").append("\n");
+            logs.append("Response Time: N/A").append("\n\n");
+            logs.append("Failed - No response received");
         }
         return logs.toString();
     }
@@ -147,6 +207,9 @@ public class ApiSmokeTest {
     // @Test
     public static String runNegativeTestRemoveAuth(String curlCommand){
         StringBuilder logs = new StringBuilder();
+        
+        // Configure RestAssured encoding
+        configureRestAssuredEncoding();
 
         ParsedCurl curl = CurlParser.parseCurl(curlCommand);
         RequestSpecification request = RestAssured.given();
@@ -356,6 +419,9 @@ public class ApiSmokeTest {
     //@Test
     public static String runNegativePayloadBody(String curlCommand) {
         StringBuilder logs = new StringBuilder();
+        
+        // Configure RestAssured encoding
+        configureRestAssuredEncoding();
 
         String mutatedPayload = CurlParserHelper.UpdatePayload(curlCommand);
         ParsedCurl curl = CurlParser.parseCurl(curlCommand);
@@ -370,7 +436,9 @@ public class ApiSmokeTest {
         }
 
         if (curl.getBody() != null) {
-            request.body(curl.getBody());
+            // Safely encode body to prevent encoding errors
+            String bodyString = encodeBodySafely(curl.getBody());
+            request.body(bodyString);
 
             Response response = switch (curl.getMethod().toUpperCase()) {
                 case "GET" -> request.get(curl.getUrl());
