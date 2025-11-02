@@ -733,31 +733,16 @@
 <div class="container">
     <div class="header">
         <h1>🚀 API Testing Suite</h1>
-        <p>Test single or multiple APIs with comprehensive automated testing.</p>
+        <p>Test multiple APIs with comprehensive automated testing.</p>
     </div>
     
     <div class="content">
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('single')">Single API</button>
-            <button class="tab" onclick="switchTab('multi')">Multiple APIs</button>
-        </div>
+        <p class="info">💡 You can paste multiple cURL commands separated by line breaks.</p>
         
-        <!-- Single API Tab -->
-        <div id="single-tab" class="tab-content active">            
-            <textarea id="curlInput" placeholder="Enter your cURL command here..."></textarea>
-            <br><br>
-            <button id="executeBtn" disabled>Execute Single API Test</button>
-        </div>
+        <textarea id="multiCurlInput" class="multi-curl-textarea" placeholder="Enter multiple cURL commands here (one per line or separated by line breaks)..."></textarea>
         
-        <!-- Multiple APIs Tab -->
-        <div id="multi-tab" class="tab-content">
-            <p class="info">💡 You can paste multiple cURL commands separated by line breaks, or use the format you provided earlier.</p>
-            
-            <textarea id="multiCurlInput" class="multi-curl-textarea" placeholder="Enter multiple cURL commands here (one per line or separated by line breaks)..."></textarea>
-            
-            
-            <button id="executeMultiBtn" disabled>Execute Multiple APIs</button>
-        </div>
+        <br><br>
+        <button id="executeMultiBtn" disabled>Execute Multiple APIs</button>
 
         <!-- 🔄 Loader element -->
         <div id="loader">
@@ -768,9 +753,7 @@
         <h2>📊 Results</h2>
         <div id="logs"></div>
 <script>
-    const curlInput = document.getElementById("curlInput");
     const multiCurlInput = document.getElementById("multiCurlInput");
-    const executeBtn = document.getElementById("executeBtn");
     const executeMultiBtn = document.getElementById("executeMultiBtn");
     const logs = document.getElementById("logs");
     const loader = document.getElementById("loader");
@@ -898,34 +881,6 @@
 
       return expectedResultsHtml;
     }
-
-    // Tab switching functionality
-    function switchTab(tabName) {
-        // Hide all tab contents
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Remove active class from all tabs
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Show selected tab content
-        document.getElementById(tabName + '-tab').classList.add('active');
-        
-        // Add active class to clicked tab
-        event.target.classList.add('active');
-        
-        // Clear logs when switching tabs
-        logs.innerHTML = "";
-    }
-
-    // Single cURL input validation
-    curlInput.addEventListener("input", () => {
-      const trimmed = curlInput.value.trim();
-      executeBtn.disabled = !(trimmed && trimmed.startsWith("curl"));
-    });
 
     // Multi cURL input validation
     multiCurlInput.addEventListener("input", () => {
@@ -1506,76 +1461,6 @@
         button.textContent = '📋 Hide Detailed Results';
       }
     }
-
-    // Single cURL execution
-    executeBtn.addEventListener("click", async () => {
-      const curlCommand = curlInput.value.trim();
-
-      if (!curlCommand.startsWith("curl")) {
-        appendLog("❌ Invalid cURL format. Must start with: curl");
-        return;
-      }
-
-      executeBtn.disabled = true;
-      loader.style.display = "block";
-      logs.innerHTML = "";
-
-      const execStart = document.createElement("div");
-      execStart.style.fontWeight = "bold";
-      execStart.style.marginBottom = "10px";
-      execStart.textContent = "🚀 Single API Execution Starts...";
-      logs.appendChild(execStart);
-
-      const curlCmdBlock = document.createElement("div");
-      curlCmdBlock.className = "curl-preview";
-      curlCmdBlock.textContent = curlCommand;
-      logs.appendChild(curlCmdBlock);
-
-      try {
-        const response = await fetch("/api/execute-curl", {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: curlCommand
-        });
-
-        // Check if response is ok (status 200-299)
-        if (!response.ok) {
-          const errorText = await response.text();
-          appendLog("❌ Server Error: " + response.status + " - " + errorText);
-          
-          const execEnd = document.createElement("div");
-          execEnd.style.fontWeight = "bold";
-          execEnd.style.marginTop = "10px";
-          execEnd.style.color = "red";
-          execEnd.textContent = "❌ Single API Execution Failed";
-          logs.appendChild(execEnd);
-          return;
-        }
-
-        const text = await response.text();
-        appendLog(text);
-
-        const execEnd = document.createElement("div");
-        execEnd.style.fontWeight = "bold";
-        execEnd.style.marginTop = "10px";
-        execEnd.textContent = "🏁 Single API Execution Finished";
-        logs.appendChild(execEnd);
-
-      } catch (err) {
-        appendLog("❌ Network Error: " + err.message);
-        
-        const execEnd = document.createElement("div");
-        execEnd.style.fontWeight = "bold";
-        execEnd.style.marginTop = "10px";
-        execEnd.style.color = "red";
-        execEnd.textContent = "❌ Single API Execution Failed";
-        logs.appendChild(execEnd);
-      } finally {
-        loader.style.display = "none";
-        const trimmed = curlInput.value.trim();
-        executeBtn.disabled = !(trimmed && trimmed.startsWith("curl"));
-      }
-    });
 
     // Multi cURL execution
     executeMultiBtn.addEventListener("click", async () => {
