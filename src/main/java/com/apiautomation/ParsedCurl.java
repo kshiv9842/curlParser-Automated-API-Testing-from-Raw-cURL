@@ -2,7 +2,6 @@ package com.apiautomation;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 public class ParsedCurl {
     private String method;
