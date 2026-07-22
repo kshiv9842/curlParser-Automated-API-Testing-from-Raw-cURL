@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Curl Parser - Multi-API Testing</title>
+    <title>curlParser - API Request Reveal</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body { 
@@ -861,8 +861,8 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>API Bug Detection Suite</h1>
-        <p>Paste cURL → run functional bug-detection cases (validation, auth gate, errors). No attack packs.</p>
+        <h1>curlParser - API Request Reveal</h1>
+        <p>Paste your API call and see exactly what's broken, slow, or wrong.</p>
     </div>
     
     <div class="content">
@@ -950,7 +950,7 @@
       });
       return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/>
-<title>API Bug Detection Report</title>
+<title>curlParser - API Request Reveal Report</title>
 <style>
   body{font-family:Segoe UI,system-ui,sans-serif;margin:24px;color:#0f172a;background:#fff}
   h1{margin:0 0 6px;font-weight:600}
@@ -965,7 +965,7 @@
   tr.FAILED td{background:#fef2f2} tr.WARNING td{background:#fffbeb} tr.PASSED td{background:#f0fdf4}
   @media print{body{margin:12px} .noprint{display:none}}
 </style></head><body>
-  <h1>API Bug Detection Suite — Report</h1>
+  <h1>curlParser - API Request Reveal — Report</h1>
   <p class="meta">Generated ${new Date().toLocaleString()} · APIs: ${multiReport.apiCount || 0} · Duration: ${multiReport.durationMs || 0}ms</p>
   <div class="tiles">
     <div class="tile t"><div style="font-size:22px;font-weight:700">${multiReport.total||0}</div>Total</div>
