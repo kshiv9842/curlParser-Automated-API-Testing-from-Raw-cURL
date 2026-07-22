@@ -19,13 +19,8 @@ RUN apt-get update \
 COPY --from=build /app/target/rest-assured-framework-1.0-SNAPSHOT.jar app.jar
 COPY ai-bridge ./ai-bridge
 
-# Install Cursor SDK when NPM token available at build (optional)
-# docker build --build-arg NPM_TOKEN=... 
-ARG NPM_TOKEN=
-RUN if [ -n "$NPM_TOKEN" ]; then \
-      cd /app/ai-bridge && npm config set //registry.npmjs.org/:_authToken="$NPM_TOKEN" \
-      && npm install --omit=dev || true; \
-    fi
+# Always install Cursor SDK from public npm (ai-bridge/.npmrc pins registry)
+RUN cd /app/ai-bridge && npm install --omit=dev
 
 ENV PORT=8080
 EXPOSE 8080
