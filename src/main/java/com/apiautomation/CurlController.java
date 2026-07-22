@@ -68,6 +68,21 @@ public class CurlController {
         boolean aiScenarios = Boolean.TRUE.equals(request.get("aiScenarios"))
                 || "true".equalsIgnoreCase(String.valueOf(request.get("aiScenarios")));
 
+        // On cloud (Render): CURSOR_API_KEY already in env — ignore any client-sent key.
+        // On local/installer: accept UI-pasted key when server env is empty.
+        String cursorApiKey = null;
+        boolean serverHasKey = System.getenv("CURSOR_API_KEY") != null
+                && !System.getenv("CURSOR_API_KEY").isBlank();
+        if (!serverHasKey) {
+            Object rawKey = request.get("cursorApiKey");
+            if (rawKey != null) {
+                String k = rawKey.toString().trim();
+                if (!k.isEmpty() && !"null".equalsIgnoreCase(k)) {
+                    cursorApiKey = k;
+                }
+            }
+        }
+
         long startTime = System.currentTimeMillis();
 
         if (curlCommands.isEmpty()) {
@@ -104,7 +119,7 @@ public class CurlController {
 
         List<SuiteReport> reports = new ArrayList<>();
         for (String curlCommand : normalizedCommands) {
-            reports.add(ApiTestSuite.runAll(curlCommand, aiScenarios));
+            reports.add(ApiTestSuite.runAll(curlCommand, aiScenarios, cursorApiKey));
         }
         return MultiSuiteReport.from(reports, System.currentTimeMillis() - startTime);
     }

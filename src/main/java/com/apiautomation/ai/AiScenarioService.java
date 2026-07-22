@@ -16,7 +16,11 @@ public final class AiScenarioService {
     private final AiScenarioGenerator fallback;
 
     public AiScenarioService() {
-        this.primary = new CursorSdkScenarioGenerator();
+        this(null);
+    }
+
+    public AiScenarioService(String cursorApiKey) {
+        this.primary = new CursorSdkScenarioGenerator(cursorApiKey);
         this.fallback = new ShapeBasedScenarioGenerator();
     }
 

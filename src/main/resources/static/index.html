@@ -432,6 +432,53 @@
             max-height: 280px;
             overflow: auto;
         }
+        .ai-options {
+            margin: 12px 0 18px;
+            padding: 14px 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+        .ai-options label.row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #334155;
+        }
+        .ai-key-panel {
+            display: none;
+            margin-top: 12px;
+        }
+        .ai-key-panel.visible { display: block; }
+        .ai-key-panel label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .ai-key-panel input {
+            width: 100%;
+            max-width: 480px;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: ui-monospace, monospace;
+            box-sizing: border-box;
+        }
+        .ai-key-panel input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .ai-key-hint {
+            margin: 8px 0 0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
         
         .result-card.info {
             border-left-color: #3b82f6;
@@ -870,11 +917,17 @@
         
         <textarea id="multiCurlInput" class="multi-curl-textarea" placeholder="Enter multiple cURL commands here (one per line or separated by line breaks)..."></textarea>
         
-        <br><br>
-        <label style="display:inline-flex;align-items:center;gap:8px;margin-right:16px;cursor:pointer;">
-            <input type="checkbox" id="aiScenariosToggle" />
-            <span>Enable AI Agents — extra scenarios from request shape (falls back to Smart Assist)</span>
-        </label>
+        <div class="ai-options">
+            <label class="row">
+                <input type="checkbox" id="aiScenariosToggle" />
+                <span>Enable AI Agents — extra scenarios from request shape (falls back to Smart Assist)</span>
+            </label>
+            <div id="aiKeyPanel" class="ai-key-panel">
+                <label for="cursorApiKeyInput">Cursor API key</label>
+                <input type="password" id="cursorApiKeyInput" placeholder="Paste CURSOR_API_KEY here" autocomplete="off" spellcheck="false" />
+                <p class="ai-key-hint">Local / installer only. Saved in this browser. Get a key from Cursor Settings → API Keys. (Cloud deploy uses the server key — this field stays hidden.)</p>
+            </div>
+        </div>
         <button id="executeMultiBtn" disabled>Execute Multiple APIs</button>
 
         <!-- 🔄 Loader element -->
@@ -889,10 +942,56 @@
     const multiCurlInput = document.getElementById("multiCurlInput");
     const executeMultiBtn = document.getElementById("executeMultiBtn");
     const aiScenariosToggle = document.getElementById("aiScenariosToggle");
+    const aiKeyPanel = document.getElementById("aiKeyPanel");
+    const cursorApiKeyInput = document.getElementById("cursorApiKeyInput");
     const logs = document.getElementById("logs");
     const loader = document.getElementById("loader");
+    const CURSOR_KEY_STORAGE = "curlparser_cursor_api_key";
     let lastStructuredReport = null;
     let reportCharts = [];
+    /** false on Render (server already has CURSOR_API_KEY); true for local/installer */
+    let showCursorKeyInput = false;
+
+    function syncAiKeyPanel() {
+      const on = !!(aiScenariosToggle && aiScenariosToggle.checked);
+      if (aiKeyPanel) {
+        // Only show key field when AI is on AND this is a local/installer build
+        aiKeyPanel.classList.toggle("visible", on && showCursorKeyInput);
+      }
+    }
+
+    async function loadRuntimeConfig() {
+      try {
+        const res = await fetch("/api/runtime-config");
+        if (res.ok) {
+          const cfg = await res.json();
+          showCursorKeyInput = !!cfg.showCursorKeyInput;
+        }
+      } catch (_) {
+        // If config fails, hide key input on known cloud hosts
+        showCursorKeyInput = !/\.onrender\.com$/i.test(location.hostname);
+      }
+      syncAiKeyPanel();
+    }
+    loadRuntimeConfig();
+
+    if (cursorApiKeyInput) {
+      try {
+        const saved = localStorage.getItem(CURSOR_KEY_STORAGE);
+        if (saved) cursorApiKeyInput.value = saved;
+      } catch (_) {}
+      cursorApiKeyInput.addEventListener("change", () => {
+        try {
+          const v = cursorApiKeyInput.value.trim();
+          if (v) localStorage.setItem(CURSOR_KEY_STORAGE, v);
+          else localStorage.removeItem(CURSOR_KEY_STORAGE);
+        } catch (_) {}
+      });
+    }
+    if (aiScenariosToggle) {
+      aiScenariosToggle.addEventListener("change", syncAiKeyPanel);
+      syncAiKeyPanel();
+    }
 
     function friendlySource(source) {
       const s = String(source || "RULE").toUpperCase();
@@ -1997,7 +2096,11 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             curlCommands: [curlCommands],
-            aiScenarios: !!(aiScenariosToggle && aiScenariosToggle.checked)
+            aiScenarios: !!(aiScenariosToggle && aiScenariosToggle.checked),
+            // Only send key from UI on local/installer; Render uses server env
+            cursorApiKey: (showCursorKeyInput && aiScenariosToggle && aiScenariosToggle.checked && cursorApiKeyInput)
+              ? cursorApiKeyInput.value.trim()
+              : ""
           })
         });
 

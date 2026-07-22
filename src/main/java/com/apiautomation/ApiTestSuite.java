@@ -20,10 +20,14 @@ public final class ApiTestSuite {
     }
 
     public static SuiteReport runAll(String curlCommand) {
-        return runAll(curlCommand, false);
+        return runAll(curlCommand, false, null);
     }
 
     public static SuiteReport runAll(String curlCommand, boolean enableAiScenarios) {
+        return runAll(curlCommand, enableAiScenarios, null);
+    }
+
+    public static SuiteReport runAll(String curlCommand, boolean enableAiScenarios, String cursorApiKey) {
         long start = System.currentTimeMillis();
         ParsedCurl parsed = CurlParser.parseCurl(curlCommand);
 
@@ -58,7 +62,8 @@ public final class ApiTestSuite {
         aiMeta.setEnabled(enableAiScenarios);
 
         if (enableAiScenarios) {
-            AiScenarioService.AiRunResult ai = new AiScenarioService().runAiScenarios(curlCommand, parsed, facts);
+            AiScenarioService.AiRunResult ai =
+                    new AiScenarioService(cursorApiKey).runAiScenarios(curlCommand, parsed, facts);
             scenarios.addAll(ai.getResults());
             aiMeta.setSource(ai.getSource());
             aiMeta.setMessage(ai.getMessage());

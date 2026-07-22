@@ -23,16 +23,23 @@ public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
 
     private final Gson gson = new Gson();
     private final Path bridgeScript;
+    private final String apiKeyOverride;
 
     public CursorSdkScenarioGenerator() {
+        this(null);
+    }
+
+    public CursorSdkScenarioGenerator(String apiKeyOverride) {
         this.bridgeScript = resolveBridgeScript();
+        this.apiKeyOverride = apiKeyOverride;
     }
 
     @Override
     public GenerationOutcome propose(ContextPack pack) {
-        String apiKey = System.getenv("CURSOR_API_KEY");
+        String apiKey = resolveApiKey();
         if (apiKey == null || apiKey.isBlank()) {
-            return new GenerationOutcome(List.of(), "AI_AGENT", "AI agent key not configured (CURSOR_API_KEY)");
+            return new GenerationOutcome(List.of(), "AI_AGENT",
+                    "AI agent key not configured — paste Cursor API key in the UI or set CURSOR_API_KEY");
         }
         if (bridgeScript == null || !Files.isRegularFile(bridgeScript)) {
             return new GenerationOutcome(List.of(), "AI_AGENT", "AI bridge script not found");
@@ -73,6 +80,14 @@ public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
         } catch (Exception e) {
             return new GenerationOutcome(List.of(), "AI_AGENT", "AI bridge error: " + e.getMessage());
         }
+    }
+
+    private String resolveApiKey() {
+        if (apiKeyOverride != null && !apiKeyOverride.isBlank()) {
+            return apiKeyOverride.trim();
+        }
+        String env = System.getenv("CURSOR_API_KEY");
+        return env == null ? "" : env.trim();
     }
 
     private List<AiScenarioSpec> parseScenarios(String raw) {
