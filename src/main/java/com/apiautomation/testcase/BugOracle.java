@@ -9,5 +9,7 @@ public enum BugOracle {
     /** Invalid input — expect client error (4xx); 2xx/5xx indicate bugs. */
     REJECT,
     /** Soft check — 4xx pass; 2xx is warning (API may intentionally ignore). */
-    OBSERVE
+    OBSERVE,
+    /** Performance case — verdict is taken from detail (PERF_VERDICT), not HTTP alone. */
+    PERF
 }

@@ -123,6 +123,46 @@ public final class BugTestCatalog {
                         "Identify if empty/blank field values are accepted when they should be rejected (validation bug).",
                         "HTTP 400 or 422 preferred; 2xx may mean empty allowed (warning); not 5xx",
                         BugOracle.OBSERVE
+                ),
+                new BugTestCaseDef(
+                        "perf_latency_sla",
+                        "Baseline Latency SLA",
+                        "P1",
+                        "Identify if the happy-path response exceeds the latency SLA (slow API / regression).",
+                        "Response < 2000ms (warning if ≥ 1000ms); HTTP 2xx preferred",
+                        BugOracle.PERF
+                ),
+                new BugTestCaseDef(
+                        "perf_timeout",
+                        "Timeout / Hang Detection",
+                        "P0",
+                        "Identify if the API hangs beyond the client timeout (availability bug).",
+                        "Response within 10000ms; hang/timeout is a failure",
+                        BugOracle.PERF
+                ),
+                new BugTestCaseDef(
+                        "perf_error_latency",
+                        "Error-Path Latency",
+                        "P2",
+                        "Identify if validation/error responses are slow (expensive fail path).",
+                        "Client-error path < 500ms (warning if ≥ 500ms); not hang/5xx",
+                        BugOracle.PERF
+                ),
+                new BugTestCaseDef(
+                        "perf_large_payload",
+                        "Large Payload Latency",
+                        "P2",
+                        "Identify if a larger body causes disproportionate slowdown or server errors.",
+                        "Large body latency ≤ max(5000ms, 5× baseline); not 5xx",
+                        BugOracle.PERF
+                ),
+                new BugTestCaseDef(
+                        "perf_repeat_get",
+                        "Repeat GET Stability",
+                        "P2",
+                        "Identify unstable latency or status across repeated GET calls (cache/cold-start smell).",
+                        "5 GETs: stable status; max latency < 3× median and < 2000ms",
+                        BugOracle.PERF
                 )
         );
     }

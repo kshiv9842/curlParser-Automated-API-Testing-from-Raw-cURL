@@ -1141,6 +1141,21 @@
       ],
       EMPTY_VALUES: [
         { icon: '⚠️', label: 'Empty Values', expected: '400/422 preferred; 2xx = warning; not 5xx' }
+      ],
+      PERF_LATENCY_SLA: [
+        { icon: '⏱️', label: 'Baseline Latency SLA', expected: '< 2000ms (warn ≥ 1000ms)' }
+      ],
+      PERF_TIMEOUT: [
+        { icon: '⏱️', label: 'Timeout / Hang', expected: 'Respond within 10000ms' }
+      ],
+      PERF_ERROR_LATENCY: [
+        { icon: '⏱️', label: 'Error-Path Latency', expected: '4xx path < 500ms preferred' }
+      ],
+      PERF_LARGE_PAYLOAD: [
+        { icon: '⏱️', label: 'Large Payload Latency', expected: '≤ max(5000ms, 5× baseline); not 5xx' }
+      ],
+      PERF_REPEAT_GET: [
+        { icon: '⏱️', label: 'Repeat GET Stability', expected: '5 GETs stable; max < 3× median' }
       ]
     };
 
@@ -1158,7 +1173,12 @@
       'Malformed JSON Test': ['MALFORMED_JSON'],
       'Oversized Payload Test': ['OVERSIZED_PAYLOAD'],
       'Special Characters Test': ['SPECIAL_CHAR'],
-      'Empty Values Test': ['EMPTY_VALUES']
+      'Empty Values Test': ['EMPTY_VALUES'],
+      'Baseline Latency SLA': ['PERF_LATENCY_SLA'],
+      'Timeout / Hang Detection': ['PERF_TIMEOUT'],
+      'Error-Path Latency': ['PERF_ERROR_LATENCY'],
+      'Large Payload Latency': ['PERF_LARGE_PAYLOAD'],
+      'Repeat GET Stability': ['PERF_REPEAT_GET']
     };
 
     // Function to get relevant expected results for a test case

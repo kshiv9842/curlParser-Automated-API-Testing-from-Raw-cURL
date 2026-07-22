@@ -48,6 +48,12 @@ public class ScenarioResult {
         if (result.detail.contains("Test Case Skipped")) {
             result.verdict = TestVerdict.SKIPPED;
             result.reason = extractReason(result.detail, result.verdict);
+        } else if (def.getOracle() == BugOracle.PERF) {
+            result.verdict = parsePerfVerdict(result.detail);
+            result.reason = extractReason(result.detail, result.verdict);
+            if (result.reason == null || result.reason.equals(result.verdict.name())) {
+                result.reason = verdictReason(def.getOracle(), result.verdict, result.statusCode);
+            }
         } else {
             result.verdict = judge(def.getOracle(), result.statusCode, def.getId());
             result.reason = verdictReason(def.getOracle(), result.verdict, result.statusCode);
@@ -152,6 +158,7 @@ public class ScenarioResult {
                 }
                 yield TestVerdict.FAILED;
             }
+            case PERF -> TestVerdict.FAILED; // should use parsePerfVerdict via fromCatalog
         };
     }
 
@@ -163,8 +170,12 @@ public class ScenarioResult {
                 case ACCEPT -> "Failed — valid request did not succeed (" + http + ")";
                 case REJECT -> "Failed — possible API bug: invalid input was not rejected (" + http + ")";
                 case OBSERVE -> "Failed — unexpected server/error behaviour (" + http + ")";
+                case PERF -> "Failed — performance check did not meet SLA (" + http + ")";
             };
-            case WARNING -> "Warning — API accepted input that is often rejected (" + http + "); review if validation is required";
+            case WARNING -> switch (oracle) {
+                case PERF -> "Warning — performance soft threshold exceeded (" + http + ")";
+                default -> "Warning — API accepted input that is often rejected (" + http + "); review if validation is required";
+            };
             case SKIPPED -> "Skipped";
             case ERROR -> "Error during execution";
         };
@@ -193,6 +204,15 @@ public class ScenarioResult {
             return Integer.parseInt(matcher.group(1));
         }
         return null;
+    }
+
+    private static TestVerdict parsePerfVerdict(String detail) {
+        Matcher m = Pattern.compile("PERF_VERDICT:\\s*(PASSED|FAILED|WARNING|SKIPPED|ERROR)", Pattern.CASE_INSENSITIVE)
+                .matcher(detail == null ? "" : detail);
+        if (m.find()) {
+            return TestVerdict.valueOf(m.group(1).toUpperCase());
+        }
+        return parseVerdict(detail);
     }
 
     private static TestVerdict parseVerdict(String detail) {

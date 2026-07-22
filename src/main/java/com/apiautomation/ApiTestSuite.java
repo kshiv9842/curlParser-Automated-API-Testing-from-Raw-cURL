@@ -82,6 +82,11 @@ public final class ApiTestSuite {
             case "boundary_values" -> ApiSmokeTest.runNegativeTestOversizedPayload(curlCommand);
             case "special_characters" -> ApiSmokeTest.runNegativeTestSpecialCharacters(curlCommand);
             case "empty_values" -> ApiSmokeTest.runNegativeTestEmptyValues(curlCommand);
+            case "perf_latency_sla" -> ApiPerfTest.runBaselineLatencySla(curlCommand);
+            case "perf_timeout" -> ApiPerfTest.runTimeoutHang(curlCommand);
+            case "perf_error_latency" -> ApiPerfTest.runErrorPathLatency(curlCommand);
+            case "perf_large_payload" -> ApiPerfTest.runLargePayloadLatency(curlCommand);
+            case "perf_repeat_get" -> ApiPerfTest.runRepeatGetStability(curlCommand);
             default -> throw new IllegalArgumentException("Unknown bug test case: " + id);
         };
     }

@@ -51,7 +51,8 @@ public final class BugTestCaseDef {
      */
     public String skipReason(RequestFacts facts) {
         return switch (id) {
-            case "smoke", "wrong_method" -> null;
+            case "smoke", "wrong_method",
+                 "perf_latency_sla", "perf_timeout", "perf_error_latency" -> null;
             case "missing_auth", "invalid_auth" -> facts.hasAuth() ? null : "No authentication header in original request";
             case "missing_headers" -> facts.hasHeaders() ? null : "No headers in original request";
             case "missing_body", "invalid_payload", "malformed_json",
@@ -72,6 +73,9 @@ public final class BugTestCaseDef {
                     ? null : "No body / non-body method — Content-Type case not applicable";
             case "invalid_path" -> facts.hasPathId() ? null : "No path id/parameter detected in URL";
             case "invalid_query", "missing_query" -> facts.hasQuery() ? null : "No query parameters in original request";
+            case "perf_large_payload" -> facts.hasBody() ? null : "No request body — large payload latency not applicable";
+            case "perf_repeat_get" -> "GET".equalsIgnoreCase(facts.getMethod())
+                    ? null : "Repeat GET stability only runs for GET requests";
             default -> null;
         };
     }
