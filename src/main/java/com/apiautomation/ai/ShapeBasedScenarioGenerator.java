@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Deterministic shape-based proposals when Cursor SDK is unavailable.
+ * Deterministic smart-assist proposals when AI Agents are unavailable.
  * Same schema + validator — not free-form hallucination.
  */
 public final class ShapeBasedScenarioGenerator implements AiScenarioGenerator {
@@ -97,8 +97,8 @@ public final class ShapeBasedScenarioGenerator implements AiScenarioGenerator {
         }
 
         String msg = out.isEmpty()
-                ? "No shape-based proposals for this request"
-                : "Generated " + out.size() + " shape-based proposals (Cursor SDK unavailable or unused)";
-        return new GenerationOutcome(out, "SHAPE", msg);
+                ? "No smart-assist proposals for this request"
+                : "Generated " + out.size() + " smart-assist proposals (AI Agents unavailable — using field-shape rules)";
+        return new GenerationOutcome(out, "SMART_ASSIST", msg);
     }
 }

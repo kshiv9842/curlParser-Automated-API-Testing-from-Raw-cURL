@@ -9,7 +9,7 @@ RUN mvn -q clean package -DskipTests
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Optional: Node for Cursor SDK bridge (SHAPE fallback works without npm SDK install)
+# Optional: Node for AI Agents bridge (Smart Assist fallback works without npm SDK install)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates \
   && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -20,7 +20,7 @@ RUN apt-get update \
 COPY --from=build /app/target/rest-assured-framework-1.0-SNAPSHOT.jar app.jar
 COPY ai-bridge ./ai-bridge
 
-# Always install Cursor SDK from public npm (ai-bridge/.npmrc pins registry)
+# Install AI Agents bridge deps from public npm (ai-bridge/.npmrc pins registry)
 RUN cd /app/ai-bridge && npm install --omit=dev
 
 ENV PORT=8080

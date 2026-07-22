@@ -37,13 +37,13 @@ public final class AiScenarioService {
         AiScenarioValidator.Result validated = AiScenarioValidator.validate(outcome.getProposed(), pack);
 
         // Single "repair" attempt: if SDK returned junk and nothing accepted, try shape fallback once
-        if (validated.getAccepted().isEmpty() && "CURSOR_SDK".equals(outcome.getSource())) {
+        if (validated.getAccepted().isEmpty() && "AI_AGENT".equals(outcome.getSource())) {
             AiScenarioGenerator.GenerationOutcome shape = fallback.propose(pack);
             validated = AiScenarioValidator.validate(shape.getProposed(), pack);
             outcome = new AiScenarioGenerator.GenerationOutcome(
                     shape.getProposed(),
-                    "SHAPE",
-                    outcome.getMessage() + " | repair-fallback: " + shape.getMessage()
+                    "SMART_ASSIST",
+                    outcome.getMessage() + " | assist-fallback: " + shape.getMessage()
             );
         }
 

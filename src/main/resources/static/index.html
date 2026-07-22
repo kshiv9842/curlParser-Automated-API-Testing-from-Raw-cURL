@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Curl Parser - Multi-API Testing</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -372,6 +373,53 @@
         }
         .scenario-fields div { margin-top: 4px; }
         .scenario-fields strong { color: #0f172a; }
+        .report-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin: 8px 0 18px;
+        }
+        .report-toolbar button {
+            background: #0f172a;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .report-toolbar button.secondary {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .report-toolbar button:hover { opacity: 0.92; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin: 8px 0 24px;
+        }
+        .chart-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .chart-card h4 {
+            margin: 0 0 12px;
+            font-size: 14px;
+            color: #334155;
+            font-weight: 600;
+        }
+        .chart-wrap {
+            position: relative;
+            height: 220px;
+        }
+        .source-AI_AGENT, .source-AI { background: #ede9fe; color: #5b21b6; }
+        .source-SMART_ASSIST, .source-SHAPE { background: #e0f2fe; color: #075985; }
+        .source-RULE, .source-Catalog { background: #e0e7ff; color: #3730a3; }
         .scenario-detail {
             display: none;
             margin-top: 10px;
@@ -825,7 +873,7 @@
         <br><br>
         <label style="display:inline-flex;align-items:center;gap:8px;margin-right:16px;cursor:pointer;">
             <input type="checkbox" id="aiScenariosToggle" />
-            <span>Enable AI scenarios (Cursor SDK; shape fallback if no API key)</span>
+            <span>Enable AI Agents — extra scenarios from request shape (falls back to Smart Assist)</span>
         </label>
         <button id="executeMultiBtn" disabled>Execute Multiple APIs</button>
 
@@ -843,6 +891,212 @@
     const aiScenariosToggle = document.getElementById("aiScenariosToggle");
     const logs = document.getElementById("logs");
     const loader = document.getElementById("loader");
+    let lastStructuredReport = null;
+    let reportCharts = [];
+
+    function friendlySource(source) {
+      const s = String(source || "RULE").toUpperCase();
+      if (s === "AI_AGENT" || s === "CURSOR_SDK" || s === "AI") return "AI Agents";
+      if (s === "SMART_ASSIST" || s === "SHAPE") return "Smart Assist";
+      if (s === "RULE") return "Catalog";
+      return source || "Catalog";
+    }
+
+    function sourceBadgeClass(source) {
+      const s = String(source || "RULE").toUpperCase();
+      if (s === "AI_AGENT" || s === "CURSOR_SDK" || s === "AI") return "source-AI_AGENT";
+      if (s === "SMART_ASSIST" || s === "SHAPE") return "source-SMART_ASSIST";
+      return "source-RULE";
+    }
+
+    function destroyReportCharts() {
+      reportCharts.forEach((c) => { try { c.destroy(); } catch (_) {} });
+      reportCharts = [];
+    }
+
+    function downloadBlob(filename, blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function stamp() {
+      const d = new Date();
+      return d.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    }
+
+    function buildStandaloneHtmlReport(multiReport) {
+      const rows = [];
+      (multiReport.reports || []).forEach((report, idx) => {
+        (report.scenarios || []).forEach((s) => {
+          rows.push(`
+            <tr class="${escapeHtml(s.verdict || "")}">
+              <td>API ${idx + 1}</td>
+              <td>${escapeHtml(report.method || "?")} ${escapeHtml(report.url || "")}</td>
+              <td>${escapeHtml(s.name || "")}</td>
+              <td><span class="badge">${escapeHtml(s.verdict || "")}</span></td>
+              <td>${escapeHtml(friendlySource(s.source))}</td>
+              <td>${escapeHtml(s.objective || "-")}</td>
+              <td>${escapeHtml(s.expectedResult || "-")}</td>
+              <td>${escapeHtml(s.actualResult || s.reason || "-")}</td>
+            </tr>
+          `);
+        });
+      });
+      return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/>
+<title>API Bug Detection Report</title>
+<style>
+  body{font-family:Segoe UI,system-ui,sans-serif;margin:24px;color:#0f172a;background:#fff}
+  h1{margin:0 0 6px;font-weight:600}
+  .meta{color:#64748b;margin-bottom:20px}
+  .tiles{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 24px}
+  .tile{padding:12px 18px;border-radius:10px;color:#fff;min-width:100px;text-align:center}
+  .t{background:#4f46e5}.p{background:#10b981}.f{background:#ef4444}.w{background:#f59e0b}.s{background:#64748b}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border:1px solid #e2e8f0;padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:#f1f5f9}
+  .badge{font-weight:700;text-transform:uppercase;font-size:11px}
+  tr.FAILED td{background:#fef2f2} tr.WARNING td{background:#fffbeb} tr.PASSED td{background:#f0fdf4}
+  @media print{body{margin:12px} .noprint{display:none}}
+</style></head><body>
+  <h1>API Bug Detection Suite — Report</h1>
+  <p class="meta">Generated ${new Date().toLocaleString()} · APIs: ${multiReport.apiCount || 0} · Duration: ${multiReport.durationMs || 0}ms</p>
+  <div class="tiles">
+    <div class="tile t"><div style="font-size:22px;font-weight:700">${multiReport.total||0}</div>Total</div>
+    <div class="tile p"><div style="font-size:22px;font-weight:700">${multiReport.passed||0}</div>Passed</div>
+    <div class="tile f"><div style="font-size:22px;font-weight:700">${multiReport.failed||0}</div>Failed</div>
+    <div class="tile w"><div style="font-size:22px;font-weight:700">${multiReport.warnings||0}</div>Warnings</div>
+    <div class="tile s"><div style="font-size:22px;font-weight:700">${(multiReport.skipped||0)+(multiReport.errors||0)}</div>Skipped/Errors</div>
+  </div>
+  <p class="noprint" style="color:#64748b;font-size:13px">Tip: use Print → Save as PDF for a PDF copy.</p>
+  <table>
+    <thead><tr>
+      <th>API #</th><th>Endpoint</th><th>Scenario</th><th>Verdict</th><th>Source</th>
+      <th>Objective</th><th>Expected</th><th>Actual</th>
+    </tr></thead>
+    <tbody>${rows.join("") || "<tr><td colspan='8'>No scenarios</td></tr>"}</tbody>
+  </table>
+</body></html>`;
+    }
+
+    function downloadHtmlReport() {
+      if (!lastStructuredReport) return;
+      const html = buildStandaloneHtmlReport(lastStructuredReport);
+      downloadBlob(`api-bug-report-${stamp()}.html`, new Blob([html], { type: "text/html;charset=utf-8" }));
+    }
+
+    function downloadPdfReport() {
+      if (!lastStructuredReport) return;
+      const html = buildStandaloneHtmlReport(lastStructuredReport);
+      const w = window.open("", "_blank");
+      if (!w) {
+        alert("Pop-up blocked. Allow pop-ups to export PDF, or download the HTML report and print it.");
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 350);
+    }
+
+    function renderReportCharts(multiReport) {
+      destroyReportCharts();
+      if (typeof Chart === "undefined") return;
+
+      const verdictData = {
+        Passed: multiReport.passed || 0,
+        Failed: multiReport.failed || 0,
+        Warnings: multiReport.warnings || 0,
+        "Skipped/Errors": (multiReport.skipped || 0) + (multiReport.errors || 0)
+      };
+
+      const sourceCounts = {};
+      (multiReport.reports || []).forEach((r) => {
+        (r.scenarios || []).forEach((s) => {
+          const label = friendlySource(s.source);
+          sourceCounts[label] = (sourceCounts[label] || 0) + 1;
+        });
+      });
+
+      const apiLabels = [];
+      const apiPassed = [];
+      const apiFailed = [];
+      const apiWarn = [];
+      (multiReport.reports || []).forEach((r, i) => {
+        apiLabels.push(`API ${i + 1}`);
+        apiPassed.push(r.passed || 0);
+        apiFailed.push(r.failed || 0);
+        apiWarn.push(r.warnings || 0);
+      });
+
+      const doughCtx = document.getElementById("verdictChart");
+      if (doughCtx) {
+        reportCharts.push(new Chart(doughCtx, {
+          type: "doughnut",
+          data: {
+            labels: Object.keys(verdictData),
+            datasets: [{
+              data: Object.values(verdictData),
+              backgroundColor: ["#10b981", "#ef4444", "#f59e0b", "#64748b"],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: "bottom" } }
+          }
+        }));
+      }
+
+      const sourceCtx = document.getElementById("sourceChart");
+      if (sourceCtx) {
+        const labels = Object.keys(sourceCounts);
+        reportCharts.push(new Chart(sourceCtx, {
+          type: "pie",
+          data: {
+            labels: labels.length ? labels : ["None"],
+            datasets: [{
+              data: labels.length ? Object.values(sourceCounts) : [1],
+              backgroundColor: ["#7c3aed", "#0ea5e9", "#6366f1", "#94a3b8"],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: "bottom" } }
+          }
+        }));
+      }
+
+      const apiCtx = document.getElementById("apiChart");
+      if (apiCtx && apiLabels.length) {
+        reportCharts.push(new Chart(apiCtx, {
+          type: "bar",
+          data: {
+            labels: apiLabels,
+            datasets: [
+              { label: "Passed", data: apiPassed, backgroundColor: "#10b981" },
+              { label: "Failed", data: apiFailed, backgroundColor: "#ef4444" },
+              { label: "Warnings", data: apiWarn, backgroundColor: "#f59e0b" }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+            plugins: { legend: { position: "bottom" } }
+          }
+        }));
+      }
+    }
 
     // Expected Results Mapping (bug-detection cases — no attack packs)
     const EXPECTED_RESULTS_MAP = {
@@ -1014,6 +1268,8 @@
     }
 
     function displayStructuredReport(multiReport) {
+      lastStructuredReport = multiReport;
+      destroyReportCharts();
       logs.innerHTML = "";
 
       if (multiReport.validationError) {
@@ -1023,6 +1279,16 @@
         logs.appendChild(err);
         return;
       }
+
+      const toolbar = document.createElement("div");
+      toolbar.className = "report-toolbar";
+      toolbar.innerHTML = `
+        <button type="button" id="downloadHtmlBtn">Download HTML report</button>
+        <button type="button" id="downloadPdfBtn" class="secondary">Export PDF (Print)</button>
+      `;
+      logs.appendChild(toolbar);
+      toolbar.querySelector("#downloadHtmlBtn").addEventListener("click", downloadHtmlReport);
+      toolbar.querySelector("#downloadPdfBtn").addEventListener("click", downloadPdfReport);
 
       const summary = document.createElement("div");
       summary.className = "summary-grid";
@@ -1040,12 +1306,22 @@
       meta.textContent = `APIs: ${multiReport.apiCount || 0} · Duration: ${multiReport.durationMs || 0}ms`;
       logs.appendChild(meta);
 
+      const charts = document.createElement("div");
+      charts.className = "charts-grid";
+      charts.innerHTML = `
+        <div class="chart-card"><h4>Verdict mix</h4><div class="chart-wrap"><canvas id="verdictChart"></canvas></div></div>
+        <div class="chart-card"><h4>Scenario source</h4><div class="chart-wrap"><canvas id="sourceChart"></canvas></div></div>
+        <div class="chart-card"><h4>Per-API results</h4><div class="chart-wrap"><canvas id="apiChart"></canvas></div></div>
+      `;
+      logs.appendChild(charts);
+      requestAnimationFrame(() => renderReportCharts(multiReport));
+
       (multiReport.reports || []).forEach((report, idx) => {
         if (report.aiMeta && report.aiMeta.enabled) {
           const aiInfo = document.createElement("div");
           aiInfo.className = "info";
           aiInfo.textContent =
-            `AI layer [${report.aiMeta.source || "-"}]: proposed ${report.aiMeta.proposed || 0}, ` +
+            `AI Agents [${friendlySource(report.aiMeta.source)}]: proposed ${report.aiMeta.proposed || 0}, ` +
             `accepted ${report.aiMeta.accepted || 0}, rejected ${report.aiMeta.rejected || 0}` +
             (report.aiMeta.message ? ` — ${report.aiMeta.message}` : "");
           logs.appendChild(aiInfo);
@@ -1078,7 +1354,7 @@
             <strong>${escapeHtml(scenario.name)}</strong>
             <span>
               <span class="verdict-badge verdict-${escapeHtml(scenario.verdict)}">${escapeHtml(scenario.verdict)}</span>
-              <span class="verdict-badge" style="background:#e0e7ff;color:#3730a3;margin-left:6px">${escapeHtml(scenario.source || "RULE")}</span>
+              <span class="verdict-badge ${sourceBadgeClass(scenario.source)}" style="margin-left:6px">${escapeHtml(friendlySource(scenario.source))}</span>
             </span>
           `;
           row.appendChild(top);

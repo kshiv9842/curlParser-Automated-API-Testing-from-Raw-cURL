@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Calls the local Node Cursor SDK bridge. Falls back to empty if unavailable.
+ * Calls the local Node AI Agents bridge. Falls back to empty if unavailable.
  */
 public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
 
@@ -32,10 +32,10 @@ public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
     public GenerationOutcome propose(ContextPack pack) {
         String apiKey = System.getenv("CURSOR_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            return new GenerationOutcome(List.of(), "CURSOR_SDK", "CURSOR_API_KEY not set");
+            return new GenerationOutcome(List.of(), "AI_AGENT", "AI agent key not configured (CURSOR_API_KEY)");
         }
         if (bridgeScript == null || !Files.isRegularFile(bridgeScript)) {
-            return new GenerationOutcome(List.of(), "CURSOR_SDK", "ai-bridge/generate.mjs not found");
+            return new GenerationOutcome(List.of(), "AI_AGENT", "AI bridge script not found");
         }
 
         try {
@@ -52,7 +52,7 @@ public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
             boolean finished = process.waitFor(180, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                return new GenerationOutcome(List.of(), "CURSOR_SDK", "Cursor SDK bridge timed out");
+                return new GenerationOutcome(List.of(), "AI_AGENT", "AI agent bridge timed out");
             }
 
             StringBuilder out = new StringBuilder();
@@ -64,14 +64,14 @@ public final class CursorSdkScenarioGenerator implements AiScenarioGenerator {
             }
 
             if (process.exitValue() != 0) {
-                return new GenerationOutcome(List.of(), "CURSOR_SDK",
-                        "Bridge exit " + process.exitValue() + ": " + trim(out.toString(), 400));
+                return new GenerationOutcome(List.of(), "AI_AGENT",
+                        "AI bridge exit " + process.exitValue() + ": " + trim(out.toString(), 400));
             }
 
             List<AiScenarioSpec> specs = parseScenarios(out.toString());
-            return new GenerationOutcome(specs, "CURSOR_SDK", "Cursor SDK proposed " + specs.size() + " scenarios");
+            return new GenerationOutcome(specs, "AI_AGENT", "AI Agents proposed " + specs.size() + " scenarios");
         } catch (Exception e) {
-            return new GenerationOutcome(List.of(), "CURSOR_SDK", "Bridge error: " + e.getMessage());
+            return new GenerationOutcome(List.of(), "AI_AGENT", "AI bridge error: " + e.getMessage());
         }
     }
 
