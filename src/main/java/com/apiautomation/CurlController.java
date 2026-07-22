@@ -1,4 +1,6 @@
 package com.apiautomation;
+import com.apiautomation.report.MultiSuiteReport;
+import com.apiautomation.report.SuiteReport;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,91 +14,129 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class CurlController {
+
+    /**
+     * Structured JSON report for a single curl (Pass / Fail / Warning / Skip).
+     */
+    @PostMapping(value = "/execute-curl/report",
+            consumes = MediaType.TEXT_PLAIN_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public SuiteReport executeCurlReport(@RequestBody String curlCommand) {
+        String curlValidationResult = validateCurlCommand(curlCommand);
+        if (curlValidationResult != null) {
+            SuiteReport report = SuiteReport.from(null, null, List.of(), 0);
+            report.setScenarios(List.of(
+                    com.apiautomation.report.ScenarioResult.error(
+                            "validation", "Curl Validation", "P0", curlValidationResult)));
+            report.setErrors(1);
+            report.setTotal(1);
+            return report;
+        }
+        String validationResult = validateSingleCurlCommand(curlCommand);
+        if (validationResult != null) {
+            SuiteReport report = SuiteReport.from(null, null, List.of(), 0);
+            report.setScenarios(List.of(
+                    com.apiautomation.report.ScenarioResult.error(
+                            "validation", "Curl Validation", "P0", validationResult)));
+            report.setErrors(1);
+            report.setTotal(1);
+            return report;
+        }
+        return ApiTestSuite.runAll(curlCommand);
+    }
+
+    /**
+     * Structured JSON report for one or more curls.
+     */
+    @PostMapping(value = "/execute-multi-curl/report",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public MultiSuiteReport executeMultiCurlReport(@RequestBody Map<String, Object> request) {
+        Object rawCommands = request.get("curlCommands");
+        List<String> curlCommands = new ArrayList<>();
+        if (rawCommands instanceof List<?> list) {
+            for (Object o : list) {
+                if (o != null) {
+                    curlCommands.add(o.toString());
+                }
+            }
+        }
+        boolean aiScenarios = Boolean.TRUE.equals(request.get("aiScenarios"))
+                || "true".equalsIgnoreCase(String.valueOf(request.get("aiScenarios")));
+
+        long startTime = System.currentTimeMillis();
+
+        if (curlCommands.isEmpty()) {
+            return MultiSuiteReport.validationFailed("No curl commands provided.");
+        }
+
+        List<String> normalizedCommands = parseAndNormalizeCurlCommands(curlCommands);
+        if (normalizedCommands.isEmpty()) {
+            return MultiSuiteReport.validationFailed("No valid curl commands found after parsing.");
+        }
+
+        String validationResult = validateMultipleCurlCommands(normalizedCommands);
+        if (validationResult != null) {
+            return MultiSuiteReport.validationFailed(validationResult);
+        }
+
+        List<SuiteReport> reports = new ArrayList<>();
+        for (String curlCommand : normalizedCommands) {
+            reports.add(ApiTestSuite.runAll(curlCommand, aiScenarios));
+        }
+        return MultiSuiteReport.from(reports, System.currentTimeMillis() - startTime);
+    }
+
     @PostMapping(value = "/execute-curl", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public String executeCurl(@RequestBody String curlCommand) throws MalformedURLException {
-        // Comprehensive curl command validation
+    public String executeCurl(@RequestBody String curlCommand) {
         String curlValidationResult = validateCurlCommand(curlCommand);
         if (curlValidationResult != null) {
             return "CURL VALIDATION ERROR: " + curlValidationResult;
         }
-        
-        // Enhanced validation for single curl command
         String validationResult = validateSingleCurlCommand(curlCommand);
         if (validationResult != null) {
             return "ERROR: " + validationResult;
         }
-        
-        // Basic validation to ensure only single curl command
         if (isMultipleCurlCommands(curlCommand)) {
             return "ERROR: Multiple curl commands detected. This endpoint only accepts single curl commands.";
         }
-        
+        return formatSuiteAsText(ApiTestSuite.runAll(curlCommand));
+    }
+
+    private String formatSuiteAsText(SuiteReport report) {
         StringBuilder logs = new StringBuilder();
-        logs.append("=== Running Basic Smoke Test (Verifies API is working with valid request) ===\n")
-                .append("Expected: API should return 200 (Success)\n\n");
-        logs.append(ApiSmokeTest.runBasicSmokeTest(curlCommand)).append("\n\n");
+        logs.append("Bug-detection suite (no attack packs)\n");
+        logs.append("API: ").append(report.getMethod()).append(" ").append(report.getUrl()).append("\n");
+        logs.append("Passed: ").append(report.getPassed())
+                .append(" | Failed: ").append(report.getFailed())
+                .append(" | Warnings: ").append(report.getWarnings())
+                .append(" | Skipped: ").append(report.getSkipped())
+                .append(" | Duration: ").append(report.getDurationMs()).append("ms\n\n");
 
-        logs.append("=== Running Negative Test: Invalid Payload Body (Checks API response to incorrect payload) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativePayloadBody(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Missing Headers (Validates error handling when required headers are absent) ===\n")
-                .append("Expected: API should return 400 or 401 (Bad Request / Unauthorized)\n\n");
-        logs.append(ApiSmokeTest.runNegativeMissingHeaders(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Missing Authentication (Ensures API blocks unauthorized requests) ===\n")
-                .append("Expected: API should return 401 or 403 (Unauthorized / Forbidden)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestRemoveAuth(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Unsupported HTTP Method (Checks API behavior when using wrong method) ===\n")
-                .append("Expected: API should return 405 (Method Not Allowed)\n\n");
-        logs.append(ApiSmokeTest.runNegativeUnsupportedMethod(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Missing Request Body (Verifies API response when body is removed) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestRemoveBody(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Invalid Path Parameters (Tests API response to incorrect path params) ===\n")
-                .append("Expected: API should return 404 (Not Found)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestUpdatePathParam(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Invalid Query Parameters (Tests API response to malformed query strings) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestInvalidQueryParams(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Missing Query Parameters (Tests API response when required query params are removed) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestMissingQueryParams(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Wrong Content-Type (Tests API response to incorrect media type) ===\n")
-                .append("Expected: API should return 400 or 415 (Bad Request / Unsupported Media Type)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestWrongContentType(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Malformed JSON (Tests API response to invalid JSON syntax) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestMalformedJson(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Negative Test: Oversized Payload (Tests API response to extremely large payloads) ===\n")
-                .append("Expected: API should return 413 or 400 (Payload Too Large / Bad Request)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestOversizedPayload(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Security Test: SQL Injection (Tests API response to SQL injection patterns) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestSqlInjection(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Edge Case Test: Special Characters (Tests API response to Unicode and special chars) ===\n")
-                .append("Expected: API should return 200 or 400 (Success or Bad Request)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestSpecialCharacters(curlCommand)).append("\n\n");
-
-        logs.append("=== Running Edge Case Test: Empty Values (Tests API response to empty/null field values) ===\n")
-                .append("Expected: API should return 400 or 422 (Bad Request / Unprocessable Entity)\n\n");
-        logs.append(ApiSmokeTest.runNegativeTestEmptyValues(curlCommand)).append("\n\n");
-
+        for (com.apiautomation.report.ScenarioResult s : report.getScenarios()) {
+            logs.append("=== ").append(s.getName()).append(" ===\n");
+            logs.append("Objective: ").append(nullToEmpty(s.getObjective())).append("\n");
+            logs.append("Expected Result: ").append(nullToEmpty(s.getExpectedResult())).append("\n");
+            logs.append("Actual Result: ").append(nullToEmpty(s.getActualResult())).append("\n");
+            logs.append("Risk: ").append(s.getRisk()).append(" | Verdict: ").append(s.getVerdict()).append("\n");
+            logs.append(nullToEmpty(s.getDetail())).append("\n\n");
+        }
         return logs.toString();
     }
-    
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     /**
-     * Execute multiple cURL commands with comprehensive testing
+     * Execute all bug-detection scenarios for a single cURL command
+     */
+    private String executeAllTestsForCurl(String curlCommand) {
+        return formatSuiteAsText(ApiTestSuite.runAll(curlCommand));
+    }
+
+    /**
+     * Execute multiple cURL commands with validation filtering (executes only valid commands)
      */
     @PostMapping(value = "/execute-multi-curl", consumes = MediaType.APPLICATION_JSON_VALUE)
     public String executeMultiCurl(@RequestBody Map<String, List<String>> request) throws MalformedURLException {
@@ -133,13 +173,17 @@ public class CurlController {
                 String result = executeAllTestsForCurl(curlCommand);
                 logs.append(result).append("\n\n");
                 
-                // Count results (simple parsing)
-                if (result.contains("Passed")) {
-                    passedTests++;
-                } else {
-                    failedTests++;
-                }
-                totalTests++;
+                // Count per-scenario outcomes in the combined result blob
+                int passedInApi = countOccurrences(result, "Passed");
+                int failedInApi = countOccurrences(result, "Failed");
+                int warningsInApi = countOccurrences(result, "Warning");
+                passedTests += passedInApi;
+                failedTests += failedInApi;
+                totalTests += passedInApi + failedInApi + warningsInApi
+                        + countOccurrences(result, "Test Case Skipped");
+                logs.append("API scenario tally — Passed: ").append(passedInApi)
+                        .append(", Failed: ").append(failedInApi)
+                        .append(", Warnings: ").append(warningsInApi).append("\n");
                 
             } catch (Exception e) {
                 logs.append("ERROR executing API ").append(i + 1).append(": ").append(e.getMessage()).append("\n");
@@ -158,61 +202,6 @@ public class CurlController {
         logs.append("Failed: ").append(failedTests).append("\n");
         logs.append("Execution Time: ").append(executionTime).append("ms\n");
         logs.append("Average Time per API: ").append(executionTime / curlCommands.size()).append("ms\n");
-        
-        return logs.toString();
-    }
-    
-    
-    /**
-     * Execute all test scenarios for a single cURL command
-     */
-    private String executeAllTestsForCurl(String curlCommand) throws MalformedURLException {
-        StringBuilder logs = new StringBuilder();
-        
-        logs.append("=== Running Basic Smoke Test ===\n");
-        logs.append(ApiSmokeTest.runBasicSmokeTest(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Invalid Payload Body ===\n");
-        logs.append(ApiSmokeTest.runNegativePayloadBody(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Missing Headers ===\n");
-        logs.append(ApiSmokeTest.runNegativeMissingHeaders(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Missing Authentication ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestRemoveAuth(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Unsupported HTTP Method ===\n");
-        logs.append(ApiSmokeTest.runNegativeUnsupportedMethod(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Missing Request Body ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestRemoveBody(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Invalid Path Parameters ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestUpdatePathParam(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Invalid Query Parameters ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestInvalidQueryParams(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Missing Query Parameters ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestMissingQueryParams(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Wrong Content-Type ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestWrongContentType(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Malformed JSON ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestMalformedJson(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Negative Test: Oversized Payload ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestOversizedPayload(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Security Test: SQL Injection ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestSqlInjection(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Edge Case Test: Special Characters ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestSpecialCharacters(curlCommand)).append("\n\n");
-        
-        logs.append("=== Running Edge Case Test: Empty Values ===\n");
-        logs.append(ApiSmokeTest.runNegativeTestEmptyValues(curlCommand)).append("\n\n");
         
         return logs.toString();
     }
@@ -262,13 +251,17 @@ public class CurlController {
                 String result = executeAllTestsForCurl(curlCommand);
                 logs.append(result).append("\n\n");
                 
-                // Count results (simple parsing)
-                if (result.contains("Passed")) {
-                    passedTests++;
-                } else {
-                    failedTests++;
-                }
-                totalTests++;
+                // Count per-scenario outcomes in the combined result blob
+                int passedInApi = countOccurrences(result, "Passed");
+                int failedInApi = countOccurrences(result, "Failed");
+                int warningsInApi = countOccurrences(result, "Warning");
+                passedTests += passedInApi;
+                failedTests += failedInApi;
+                totalTests += passedInApi + failedInApi + warningsInApi
+                        + countOccurrences(result, "Test Case Skipped");
+                logs.append("API scenario tally — Passed: ").append(passedInApi)
+                        .append(", Failed: ").append(failedInApi)
+                        .append(", Warnings: ").append(warningsInApi).append("\n");
                 
             } catch (Exception e) {
                 logs.append("ERROR executing API ").append(i + 1).append(": ").append(e.getMessage()).append("\n");
