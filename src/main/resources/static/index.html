@@ -299,9 +299,90 @@
         .result-card.error {
             border-left-color: #ef4444;
         }
-        
+
         .result-card.warning {
             border-left-color: #f59e0b;
+        }
+
+        .result-card.skipped {
+            border-left-color: #94a3b8;
+        }
+
+        .verdict-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .verdict-PASSED { background: #d1fae5; color: #065f46; }
+        .verdict-FAILED { background: #fee2e2; color: #991b1b; }
+        .verdict-WARNING { background: #fef3c7; color: #92400e; }
+        .verdict-SKIPPED { background: #e2e8f0; color: #475569; }
+        .verdict-ERROR { background: #fee2e2; color: #7f1d1d; }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin: 16px 0 24px;
+        }
+        .summary-tile {
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            color: #fff;
+        }
+        .summary-tile h3 { margin: 0; font-size: 1.8em; }
+        .summary-tile p { margin: 6px 0 0; opacity: 0.95; font-size: 13px; }
+        .tile-passed { background: #10b981; }
+        .tile-failed { background: #ef4444; }
+        .tile-warning { background: #f59e0b; }
+        .tile-skipped { background: #64748b; }
+        .tile-total { background: #4f46e5; }
+
+        .scenario-list { display: flex; flex-direction: column; gap: 10px; }
+        .scenario-row {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-left-width: 5px;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .scenario-row.PASSED { border-left-color: #10b981; }
+        .scenario-row.FAILED { border-left-color: #ef4444; }
+        .scenario-row.WARNING { border-left-color: #f59e0b; }
+        .scenario-row.SKIPPED { border-left-color: #94a3b8; }
+        .scenario-row.ERROR { border-left-color: #7f1d1d; }
+        .scenario-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .scenario-meta { color: #64748b; font-size: 12px; margin-top: 6px; }
+        .scenario-reason { margin-top: 8px; font-size: 13px; color: #334155; }
+        .scenario-fields {
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #1e293b;
+        }
+        .scenario-fields div { margin-top: 4px; }
+        .scenario-fields strong { color: #0f172a; }
+        .scenario-detail {
+            display: none;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 280px;
+            overflow: auto;
         }
         
         .result-card.info {
@@ -732,16 +813,20 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🚀 API Testing Suite</h1>
-        <p>Test multiple APIs with comprehensive automated testing.</p>
+        <h1>API Bug Detection Suite</h1>
+        <p>Paste cURL → run functional bug-detection cases (validation, auth gate, errors). No attack packs.</p>
     </div>
     
     <div class="content">
-        <p class="info">💡 You can paste multiple cURL commands separated by line breaks.</p>
+        <p class="info">Bug mode: Objective / Expected / Actual per case. SQL injection & attack probes are not included.</p>
         
         <textarea id="multiCurlInput" class="multi-curl-textarea" placeholder="Enter multiple cURL commands here (one per line or separated by line breaks)..."></textarea>
         
         <br><br>
+        <label style="display:inline-flex;align-items:center;gap:8px;margin-right:16px;cursor:pointer;">
+            <input type="checkbox" id="aiScenariosToggle" />
+            <span>Enable AI scenarios (Cursor SDK; shape fallback if no API key)</span>
+        </label>
         <button id="executeMultiBtn" disabled>Execute Multiple APIs</button>
 
         <!-- 🔄 Loader element -->
@@ -755,55 +840,53 @@
 <script>
     const multiCurlInput = document.getElementById("multiCurlInput");
     const executeMultiBtn = document.getElementById("executeMultiBtn");
+    const aiScenariosToggle = document.getElementById("aiScenariosToggle");
     const logs = document.getElementById("logs");
     const loader = document.getElementById("loader");
 
-    // Expected Results Mapping
+    // Expected Results Mapping (bug-detection cases — no attack packs)
     const EXPECTED_RESULTS_MAP = {
       SMOKE: [
-        { icon: '✅', label: 'Basic Smoke Test', expected: 'API should return 200 (Success)' }
+        { icon: '✅', label: 'Basic Smoke Test', expected: 'HTTP 2xx (Success)' }
       ],
       INVALID_PAYLOAD: [
-        { icon: '❌', label: 'Invalid Payload Body', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '🐛', label: 'Invalid Payload Body', expected: 'HTTP 400 or 422; not 2xx/5xx' }
       ],
       MISSING_HEADERS: [
-        { icon: '❌', label: 'Missing Headers', expected: 'API should return 400 or 401 (Bad Request / Unauthorized)' }
+        { icon: '🐛', label: 'Missing Headers', expected: 'HTTP 4xx' }
       ],
       MISSING_AUTH: [
-        { icon: '❌', label: 'Missing Authentication', expected: 'API should return 401 or 403 (Unauthorized / Forbidden)' }
+        { icon: '🐛', label: 'Missing Authentication', expected: 'HTTP 401 or 403' }
       ],
       UNSUPPORTED_METHOD: [
-        { icon: '❌', label: 'Unsupported HTTP Method', expected: 'API should return 405 (Method Not Allowed)' }
+        { icon: '🐛', label: 'Unsupported HTTP Method', expected: 'HTTP 405/404/501; not 5xx' }
       ],
       MISSING_BODY: [
-        { icon: '❌', label: 'Missing Request Body', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '🐛', label: 'Missing Request Body', expected: 'HTTP 400, 415, or 422' }
       ],
       INVALID_PATH: [
-        { icon: '❌', label: 'Invalid Path Parameters', expected: 'API should return 404 (Not Found)' }
+        { icon: '🐛', label: 'Invalid Path Parameters', expected: 'HTTP 404 or 400' }
       ],
       INVALID_QUERY: [
-        { icon: '❌', label: 'Invalid Query Parameters', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '⚠️', label: 'Invalid Query Parameters', expected: '4xx preferred; 2xx = warning; not 5xx' }
       ],
       MISSING_QUERY: [
-        { icon: '❌', label: 'Missing Query Parameters', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '⚠️', label: 'Missing Query Parameters', expected: '4xx if required; 2xx = warning; not 5xx' }
       ],
       WRONG_CONTENT_TYPE: [
-        { icon: '❌', label: 'Wrong Content-Type', expected: 'API should return 400 or 415 (Bad Request / Unsupported Media Type)' }
+        { icon: '⚠️', label: 'Wrong Content-Type', expected: '400/415/422 preferred; 2xx = warning' }
       ],
       MALFORMED_JSON: [
-        { icon: '❌', label: 'Malformed JSON', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '🐛', label: 'Malformed JSON', expected: 'HTTP 400 or 422; not 2xx/5xx' }
       ],
       OVERSIZED_PAYLOAD: [
-        { icon: '❌', label: 'Oversized Payload', expected: 'API should return 413 or 400 (Payload Too Large / Bad Request)' }
-      ],
-      SQL_INJECTION: [
-        { icon: '🔒', label: 'SQL Injection', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '⚠️', label: 'Boundary / Oversized Payload', expected: '413/400/422 or controlled reject; not 5xx' }
       ],
       SPECIAL_CHAR: [
-        { icon: '🔤', label: 'Special Characters', expected: 'API should return 200 or 400 (Success or Bad Request)' }
+        { icon: '🐛', label: 'Special Characters', expected: 'HTTP 2xx or 4xx; not 5xx' }
       ],
       EMPTY_VALUES: [
-        { icon: '📝', label: 'Empty Values', expected: 'API should return 400 or 422 (Bad Request / Unprocessable Entity)' }
+        { icon: '⚠️', label: 'Empty Values', expected: '400/422 preferred; 2xx = warning; not 5xx' }
       ]
     };
 
@@ -820,7 +903,6 @@
       'Wrong Content-Type Test': ['WRONG_CONTENT_TYPE'],
       'Malformed JSON Test': ['MALFORMED_JSON'],
       'Oversized Payload Test': ['OVERSIZED_PAYLOAD'],
-      'SQL Injection Test': ['SQL_INJECTION'],
       'Special Characters Test': ['SPECIAL_CHAR'],
       'Empty Values Test': ['EMPTY_VALUES']
     };
@@ -852,10 +934,8 @@
         testType = 'Wrong Content-Type Test';
       } else if (testName.includes('Malformed JSON')) {
         testType = 'Malformed JSON Test';
-      } else if (testName.includes('Oversized Payload')) {
+      } else if (testName.includes('Oversized') || testName.includes('Boundary')) {
         testType = 'Oversized Payload Test';
-      } else if (testName.includes('SQL Injection')) {
-        testType = 'SQL Injection Test';
       } else if (testName.includes('Special Characters')) {
         testType = 'Special Characters Test';
       } else if (testName.includes('Empty Values')) {
@@ -892,6 +972,8 @@
       let blockColor = "red";
       if (blockLines.some(l => l.includes("Passed"))) {
         blockColor = "green";
+      } else if (blockLines.some(l => l.includes("Warning"))) {
+        blockColor = "#f59e0b";
       } else if (blockLines.some(l => l.includes("Test Case Skipped"))) {
         blockColor = "orange";
       }
@@ -906,18 +988,144 @@
         highlighted = highlighted
           .replace(/\bPassed\b/g, `<span style="color:green; font-weight:bold">Passed</span>`)
           .replace(/\bFailed\b/g, `<span style="color:red; font-weight:bold">Failed</span>`)
+          .replace(/\bWarning\b/g, `<span style="color:#f59e0b; font-weight:bold">Warning</span>`)
           .replace(/Test Case Skipped/g, `<span style="color:orange; font-weight:bold">Test Case Skipped</span>`);
 
         if (idx === 0 && line.startsWith("=== Running")) {
           let statusText = "";
           if (blockColor === "green") statusText = " ✅ Passed";
           else if (blockColor === "red") statusText = " ❌ Failed";
+          else if (blockColor === "#f59e0b") statusText = " ⚠️ Warning";
           else if (blockColor === "orange") statusText = " ⚠️ Skipped";
 
           highlighted += ` <span style="color:${blockColor}; font-weight:bold">${statusText}</span>`;
         }
 
         return highlighted;
+      });
+    }
+
+    function escapeHtml(text) {
+      return String(text == null ? "" : text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function displayStructuredReport(multiReport) {
+      logs.innerHTML = "";
+
+      if (multiReport.validationError) {
+        const err = document.createElement("div");
+        err.className = "warning";
+        err.textContent = multiReport.validationError;
+        logs.appendChild(err);
+        return;
+      }
+
+      const summary = document.createElement("div");
+      summary.className = "summary-grid";
+      summary.innerHTML = `
+        <div class="summary-tile tile-total"><h3>${multiReport.total || 0}</h3><p>Total</p></div>
+        <div class="summary-tile tile-passed"><h3>${multiReport.passed || 0}</h3><p>Passed</p></div>
+        <div class="summary-tile tile-failed"><h3>${multiReport.failed || 0}</h3><p>Failed</p></div>
+        <div class="summary-tile tile-warning"><h3>${multiReport.warnings || 0}</h3><p>Warnings</p></div>
+        <div class="summary-tile tile-skipped"><h3>${(multiReport.skipped || 0) + (multiReport.errors || 0)}</h3><p>Skipped/Errors</p></div>
+      `;
+      logs.appendChild(summary);
+
+      const meta = document.createElement("p");
+      meta.className = "info";
+      meta.textContent = `APIs: ${multiReport.apiCount || 0} · Duration: ${multiReport.durationMs || 0}ms`;
+      logs.appendChild(meta);
+
+      (multiReport.reports || []).forEach((report, idx) => {
+        if (report.aiMeta && report.aiMeta.enabled) {
+          const aiInfo = document.createElement("div");
+          aiInfo.className = "info";
+          aiInfo.textContent =
+            `AI layer [${report.aiMeta.source || "-"}]: proposed ${report.aiMeta.proposed || 0}, ` +
+            `accepted ${report.aiMeta.accepted || 0}, rejected ${report.aiMeta.rejected || 0}` +
+            (report.aiMeta.message ? ` — ${report.aiMeta.message}` : "");
+          logs.appendChild(aiInfo);
+        }
+
+        const apiBlock = document.createElement("div");
+        apiBlock.style.marginBottom = "24px";
+
+        const title = document.createElement("h3");
+        title.textContent = `API ${idx + 1}: ${report.method || "?"} ${report.url || "Unknown"}`;
+        apiBlock.appendChild(title);
+
+        const apiSummary = document.createElement("p");
+        apiSummary.style.color = "#64748b";
+        apiSummary.style.fontSize = "13px";
+        apiSummary.textContent =
+          `Passed ${report.passed} · Failed ${report.failed} · Warning ${report.warnings} · Skipped ${report.skipped} · ${report.durationMs}ms`;
+        apiBlock.appendChild(apiSummary);
+
+        const list = document.createElement("div");
+        list.className = "scenario-list";
+
+        (report.scenarios || []).forEach((scenario) => {
+          const row = document.createElement("div");
+          row.className = `scenario-row ${scenario.verdict || "ERROR"}`;
+
+          const top = document.createElement("div");
+          top.className = "scenario-top";
+          top.innerHTML = `
+            <strong>${escapeHtml(scenario.name)}</strong>
+            <span>
+              <span class="verdict-badge verdict-${escapeHtml(scenario.verdict)}">${escapeHtml(scenario.verdict)}</span>
+              <span class="verdict-badge" style="background:#e0e7ff;color:#3730a3;margin-left:6px">${escapeHtml(scenario.source || "RULE")}</span>
+            </span>
+          `;
+          row.appendChild(top);
+
+          const metaLine = document.createElement("div");
+          metaLine.className = "scenario-meta";
+          metaLine.textContent = `Risk ${scenario.risk || "-"} · Status ${scenario.statusCode != null ? scenario.statusCode : "n/a"}`;
+          row.appendChild(metaLine);
+
+          const fields = document.createElement("div");
+          fields.className = "scenario-fields";
+          fields.innerHTML = `
+            <div><strong>Objective:</strong> ${escapeHtml(scenario.objective || "-")}</div>
+            <div><strong>Expected Result:</strong> ${escapeHtml(scenario.expectedResult || "-")}</div>
+            <div><strong>Actual Result:</strong> ${escapeHtml(scenario.actualResult || scenario.reason || "-")}</div>
+          `;
+          row.appendChild(fields);
+
+          const reason = document.createElement("div");
+          reason.className = "scenario-reason";
+          reason.textContent = scenario.reason || "";
+          row.appendChild(reason);
+
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.textContent = "Details";
+          toggle.style.marginTop = "8px";
+          toggle.style.padding = "8px 14px";
+          toggle.style.fontSize = "13px";
+
+          const detail = document.createElement("pre");
+          detail.className = "scenario-detail";
+          detail.textContent = scenario.detail || "";
+
+          toggle.addEventListener("click", () => {
+            const open = detail.style.display === "block";
+            detail.style.display = open ? "none" : "block";
+            toggle.textContent = open ? "Details" : "Hide details";
+          });
+
+          row.appendChild(toggle);
+          row.appendChild(detail);
+          list.appendChild(row);
+        });
+
+        apiBlock.appendChild(list);
+        logs.appendChild(apiBlock);
       });
     }
 
@@ -1326,9 +1534,10 @@
     function getTestStatus(block) {
       const blockText = block.join(' ').toLowerCase();
       if (blockText.includes('passed')) return 'passed';
+      if (blockText.includes('warning')) return 'warning';
+      if (blockText.includes('skipped') || blockText.includes('skip')) return 'skipped';
       if (blockText.includes('failed') || blockText.includes('error') || 
           blockText.includes('exception') || blockText.includes('timeout')) return 'failed';
-      if (blockText.includes('skipped') || blockText.includes('skip')) return 'skipped';
       return 'running';
     }
     
@@ -1487,10 +1696,13 @@
       logs.appendChild(curlCmdBlock);
 
       try {
-        const response = await fetch("/api/execute-multi-curl", {
+        const response = await fetch("/api/execute-multi-curl/report", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ curlCommands: [curlCommands] })
+          body: JSON.stringify({
+            curlCommands: [curlCommands],
+            aiScenarios: !!(aiScenariosToggle && aiScenariosToggle.checked)
+          })
         });
 
         // Check if response is ok (status 200-299)
@@ -1507,8 +1719,8 @@
           return;
         }
 
-        const text = await response.text();
-        appendLog(text);
+        const report = await response.json();
+        displayStructuredReport(report);
 
         const execEnd = document.createElement("div");
         execEnd.style.fontWeight = "bold";
