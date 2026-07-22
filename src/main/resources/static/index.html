@@ -2004,7 +2004,16 @@
         // Check if response is ok (status 200-299)
         if (!response.ok) {
           const errorText = await response.text();
-          appendLog("❌ Server Error: " + response.status + " - " + errorText);
+          let msg = errorText;
+          try {
+            const j = JSON.parse(errorText);
+            if (j && j.error) msg = j.error;
+          } catch (_) {}
+          if (response.status === 429) {
+            appendLog("⏳ Rate limited: " + msg);
+          } else {
+            appendLog("❌ Server Error: " + response.status + " - " + msg);
+          }
           
           const execEnd = document.createElement("div");
           execEnd.style.fontWeight = "bold";

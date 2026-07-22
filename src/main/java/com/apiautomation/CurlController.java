@@ -1,6 +1,8 @@
 package com.apiautomation;
 import com.apiautomation.report.MultiSuiteReport;
 import com.apiautomation.report.SuiteReport;
+import com.apiautomation.security.ApiSecurityProperties;
+import com.apiautomation.security.SsrfGuard;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,6 +17,12 @@ import java.util.Map;
 @RequestMapping("/api")
 public class CurlController {
 
+    private final ApiSecurityProperties securityProperties;
+
+    public CurlController(ApiSecurityProperties securityProperties) {
+        this.securityProperties = securityProperties;
+    }
+
     /**
      * Structured JSON report for a single curl (Pass / Fail / Warning / Skip).
      */
@@ -22,25 +30,21 @@ public class CurlController {
             consumes = MediaType.TEXT_PLAIN_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public SuiteReport executeCurlReport(@RequestBody String curlCommand) {
+        String sizeError = validateRequestSize(curlCommand);
+        if (sizeError != null) {
+            return validationSuiteError(sizeError);
+        }
         String curlValidationResult = validateCurlCommand(curlCommand);
         if (curlValidationResult != null) {
-            SuiteReport report = SuiteReport.from(null, null, List.of(), 0);
-            report.setScenarios(List.of(
-                    com.apiautomation.report.ScenarioResult.error(
-                            "validation", "Curl Validation", "P0", curlValidationResult)));
-            report.setErrors(1);
-            report.setTotal(1);
-            return report;
+            return validationSuiteError(curlValidationResult);
         }
         String validationResult = validateSingleCurlCommand(curlCommand);
         if (validationResult != null) {
-            SuiteReport report = SuiteReport.from(null, null, List.of(), 0);
-            report.setScenarios(List.of(
-                    com.apiautomation.report.ScenarioResult.error(
-                            "validation", "Curl Validation", "P0", validationResult)));
-            report.setErrors(1);
-            report.setTotal(1);
-            return report;
+            return validationSuiteError(validationResult);
+        }
+        String ssrf = validateSsrf(curlCommand);
+        if (ssrf != null) {
+            return validationSuiteError(ssrf);
         }
         return ApiTestSuite.runAll(curlCommand);
     }
@@ -70,14 +74,32 @@ public class CurlController {
             return MultiSuiteReport.validationFailed("No curl commands provided.");
         }
 
+        String sizeError = validateRequestSize(String.join("\n", curlCommands));
+        if (sizeError != null) {
+            return MultiSuiteReport.validationFailed(sizeError);
+        }
+
         List<String> normalizedCommands = parseAndNormalizeCurlCommands(curlCommands);
         if (normalizedCommands.isEmpty()) {
             return MultiSuiteReport.validationFailed("No valid curl commands found after parsing.");
         }
 
+        if (normalizedCommands.size() > securityProperties.getMaxCurlsPerRequest()) {
+            return MultiSuiteReport.validationFailed(
+                    "Too many curl commands — max " + securityProperties.getMaxCurlsPerRequest()
+                            + " per request (got " + normalizedCommands.size() + ").");
+        }
+
         String validationResult = validateMultipleCurlCommands(normalizedCommands);
         if (validationResult != null) {
             return MultiSuiteReport.validationFailed(validationResult);
+        }
+
+        for (String curlCommand : normalizedCommands) {
+            String ssrf = validateSsrf(curlCommand);
+            if (ssrf != null) {
+                return MultiSuiteReport.validationFailed(ssrf);
+            }
         }
 
         List<SuiteReport> reports = new ArrayList<>();
@@ -87,8 +109,39 @@ public class CurlController {
         return MultiSuiteReport.from(reports, System.currentTimeMillis() - startTime);
     }
 
+    private SuiteReport validationSuiteError(String message) {
+        SuiteReport report = SuiteReport.from(null, null, List.of(), 0);
+        report.setScenarios(List.of(
+                com.apiautomation.report.ScenarioResult.error(
+                        "validation", "Curl Validation", "P0", message)));
+        report.setErrors(1);
+        report.setTotal(1);
+        return report;
+    }
+
+    private String validateRequestSize(String payload) {
+        if (payload != null && payload.length() > securityProperties.getMaxRequestChars()) {
+            return "Request too large — max " + securityProperties.getMaxRequestChars()
+                    + " characters (got " + payload.length() + ").";
+        }
+        return null;
+    }
+
+    private String validateSsrf(String curlCommand) {
+        try {
+            ParsedCurl parsed = CurlParser.parseCurl(curlCommand);
+            return SsrfGuard.check(parsed.getUrl());
+        } catch (Exception e) {
+            return "Unable to validate URL for SSRF protection: " + e.getMessage();
+        }
+    }
+
     @PostMapping(value = "/execute-curl", consumes = MediaType.TEXT_PLAIN_VALUE)
     public String executeCurl(@RequestBody String curlCommand) {
+        String sizeError = validateRequestSize(curlCommand);
+        if (sizeError != null) {
+            return "ERROR: " + sizeError;
+        }
         String curlValidationResult = validateCurlCommand(curlCommand);
         if (curlValidationResult != null) {
             return "CURL VALIDATION ERROR: " + curlValidationResult;
@@ -99,6 +152,10 @@ public class CurlController {
         }
         if (isMultipleCurlCommands(curlCommand)) {
             return "ERROR: Multiple curl commands detected. This endpoint only accepts single curl commands.";
+        }
+        String ssrf = validateSsrf(curlCommand);
+        if (ssrf != null) {
+            return "ERROR: " + ssrf;
         }
         return formatSuiteAsText(ApiTestSuite.runAll(curlCommand));
     }
@@ -143,6 +200,14 @@ public class CurlController {
         List<String> curlCommands = request.get("curlCommands");
         StringBuilder logs = new StringBuilder();
         long startTime = System.currentTimeMillis();
+
+        if (curlCommands == null || curlCommands.isEmpty()) {
+            return "VALIDATION FAILED:\nNo curl commands provided.";
+        }
+        String sizeError = validateRequestSize(String.join("\n", curlCommands));
+        if (sizeError != null) {
+            return "VALIDATION FAILED:\n" + sizeError;
+        }
         
         // Validate all curl commands first
         String validationResult = validateMultipleCurlCommands(curlCommands);
@@ -153,6 +218,16 @@ public class CurlController {
         
         // Parse and normalize cURL commands (handle line breaks)
         List<String> normalizedCommands = parseAndNormalizeCurlCommands(curlCommands);
+        if (normalizedCommands.size() > securityProperties.getMaxCurlsPerRequest()) {
+            return "VALIDATION FAILED:\nToo many curl commands — max "
+                    + securityProperties.getMaxCurlsPerRequest() + " per request.";
+        }
+        for (String cmd : normalizedCommands) {
+            String ssrf = validateSsrf(cmd);
+            if (ssrf != null) {
+                return "VALIDATION FAILED:\n" + ssrf;
+            }
+        }
         
         logs.append("=== Multi-cURL Execution Started ===\n");
         logs.append("Original Commands: ").append(curlCommands.size()).append("\n");
@@ -230,6 +305,16 @@ public class CurlController {
         
         // Parse and normalize cURL commands (handle line breaks)
         List<String> normalizedCommands = parseAndNormalizeCurlCommands(validCommands);
+        if (normalizedCommands.size() > securityProperties.getMaxCurlsPerRequest()) {
+            return "ERROR: Too many curl commands — max "
+                    + securityProperties.getMaxCurlsPerRequest() + " per request.";
+        }
+        for (String cmd : normalizedCommands) {
+            String ssrf = validateSsrf(cmd);
+            if (ssrf != null) {
+                return "ERROR: " + ssrf;
+            }
+        }
         
         logs.append("=== Multi-cURL Filtered Execution Started ===\n");
         logs.append("Original Commands: ").append(curlCommands.size()).append("\n");

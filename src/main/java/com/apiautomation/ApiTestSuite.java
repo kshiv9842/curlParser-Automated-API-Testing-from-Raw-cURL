@@ -3,6 +3,7 @@ package com.apiautomation;
 import com.apiautomation.ai.AiScenarioService;
 import com.apiautomation.report.ScenarioResult;
 import com.apiautomation.report.SuiteReport;
+import com.apiautomation.security.SsrfGuard;
 import com.apiautomation.testcase.BugTestCaseDef;
 import com.apiautomation.testcase.BugTestCatalog;
 import com.apiautomation.testcase.RequestFacts;
@@ -25,6 +26,17 @@ public final class ApiTestSuite {
     public static SuiteReport runAll(String curlCommand, boolean enableAiScenarios) {
         long start = System.currentTimeMillis();
         ParsedCurl parsed = CurlParser.parseCurl(curlCommand);
+
+        String ssrf = SsrfGuard.check(parsed.getUrl());
+        if (ssrf != null) {
+            return SuiteReport.from(
+                    parsed.getMethod(),
+                    parsed.getUrl(),
+                    List.of(ScenarioResult.error("ssrf", "SSRF Protection", "P0", ssrf)),
+                    System.currentTimeMillis() - start
+            );
+        }
+
         RequestFacts facts = RequestFacts.from(parsed);
         List<ScenarioResult> scenarios = new ArrayList<>();
 
