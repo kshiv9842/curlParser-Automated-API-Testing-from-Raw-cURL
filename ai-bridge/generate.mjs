@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Cursor SDK bridge for curlParser AI scenarios.
+ * AI Agents bridge for curlParser scenarios.
  *
  * stdin:  ContextPack JSON
  * stdout: { "scenarios": [ ... ] }  (strict schema)
