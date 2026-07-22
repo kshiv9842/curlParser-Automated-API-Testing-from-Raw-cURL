@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Cursor SDK bridge: ContextPack in → constrained AI scenarios JSON out",
+  "description": "AI Agents bridge: ContextPack in → constrained scenarios JSON out",
   "dependencies": {
     "@cursor/sdk": "^1.0.0"
   }
